@@ -7,7 +7,31 @@ description: "Agente inteligente de LinkedIn do Matheus Zacche. USAR SEMPRE que 
 
 Agente inteligente para gestao completa da marca pessoal do Matheus Caetano (Matheus Zacche) no LinkedIn. Nao apenas executa: DIAGNOSTICA o perfil, PLANEJA conteudo, DECIDE formato, CRIA texto e visual, e MANTEM historico.
 
-Antes de qualquer fluxo, ler `references/perfil.md` para contexto do autor.
+## REGRA ZERO: Consciencia Temporal
+
+ANTES de qualquer acao, o agente DEVE:
+1. Verificar a data de HOJE (usar a data do sistema, nunca inventar)
+2. Verificar o dia da semana atual
+3. Ler `references/historico-publicacoes.md` para saber quando foi o ultimo post
+4. Calcular quantos dias se passaram desde o ultimo post
+5. Ler `references/perfil.md` para contexto do autor
+
+**Regras temporais:**
+- Se o usuario ja postou HOJE: NAO sugerir novo post. Dizer "Voce ja postou hoje. Melhor deixar o algoritmo trabalhar e postar novamente na [proximo dia ideal]."
+- Se o usuario postou ONTEM: avaliar se faz sentido postar hoje ou esperar. Lembrar do intervalo minimo de 12h.
+- Se faz 2+ dias sem post: sugerir postar, com urgencia proporcional ao gap.
+- Se faz 5+ dias: alertar que a consistencia esta caindo e sugerir retomar.
+- NUNCA sugerir datas que ja passaram. Sempre trabalhar com HOJE em diante.
+- Considerar os melhores dias: terca a quinta (8h-10h). Se hoje for sexta/sabado/domingo, pode sugerir esperar ate terca, a nao ser que o gap ja seja grande.
+
+**Formato de consciencia temporal (mostrar sempre no inicio):**
+```
+SITUACAO ATUAL:
+Hoje: [dia da semana], [data]
+Ultimo post: [data] ([X dias atras])
+Posts esta semana: [N]
+Recomendacao: [postar agora / esperar ate [dia]]
+```
 
 ## Workflow Principal
 
@@ -31,12 +55,19 @@ O agente opera em 3 camadas:
 **Camada 3: Manutencao (estado)**
 12. **Analisar performance** -> Seguir "Fluxo: Analise"
 
-Quando o usuario pedir algo generico como "me sugere o que postar" ou "o que publico essa semana", o agente deve:
-1. Ler `references/historico-publicacoes.md`
-2. Ler `references/decisao-formato.md`
-3. Identificar gaps (pilar ausente, formato repetido)
-4. Recomendar tema + formato com justificativa
-5. Perguntar se o usuario quer que crie o conteudo
+Quando o usuario pedir algo generico como "me sugere o que postar" ou "o que publico essa semana", o agente DEVE seguir esta sequencia EXATA:
+
+1. Aplicar REGRA ZERO (consciencia temporal)
+2. Se o historico estiver vazio ou desatualizado, PRIMEIRO sugerir rodar o "Fluxo: Diagnostico" para atualizar
+3. Ler `references/historico-publicacoes.md`
+4. Ler `references/decisao-formato.md`
+5. Identificar gaps (pilar ausente, formato repetido, tempo sem postar)
+6. Avaliar se AGORA e o momento certo para postar ou se e melhor esperar
+7. Se for momento de postar: recomendar tema + formato com justificativa
+8. Se NAO for momento: explicar por que e melhor esperar e quando postar
+9. Perguntar se o usuario quer que crie o conteudo
+
+**O agente deve ser HONESTO**: se nao faz sentido postar agora, dizer isso. Nao ficar preenchendo slots so porque o usuario pediu. Pensar como um social media manager de verdade.
 
 ---
 
@@ -66,8 +97,14 @@ Acessar o LinkedIn pelo browser para ler publicacoes recentes e atualizar histor
 
 ## Fluxo: Planejamento Inteligente
 
-Decidir autonomamente O QUE postar e EM QUAL FORMATO, com justificativa.
+Decidir autonomamente O QUE postar, QUANDO postar e EM QUAL FORMATO, com justificativa.
 
+**PRIMEIRO**: Aplicar REGRA ZERO (consciencia temporal). Mostrar o bloco SITUACAO ATUAL.
+
+**SEGUNDO**: Se o historico estiver vazio ou tiver apenas o placeholder, informar o usuario:
+"Seu historico esta vazio. Para eu fazer recomendacoes inteligentes, preciso saber o que voce ja postou. Posso fazer um diagnostico do seu LinkedIn agora (precisa estar logado no Chrome) ou voce pode me contar seus ultimos posts."
+
+**TERCEIRO**: Se tiver historico, analisar:
 1. Ler `references/historico-publicacoes.md`
 2. Ler `references/decisao-formato.md`
 3. Ler `references/banco-de-ideias.md`
@@ -77,21 +114,34 @@ Decidir autonomamente O QUE postar e EM QUAL FORMATO, com justificativa.
    - "Faz X dias sem post de [pilar]"
    - "Ultimos Y posts foram todos [formato]"
    - "Tema Z nunca foi abordado"
-7. Decidir formato baseado em alternancia e adequacao:
+7. Avaliar timing:
+   - Qual o proximo dia ideal para postar? (considerar hoje, dia da semana, ultimo post)
+   - Se hoje NAO e dia ideal, sugerir data futura
+   - Se hoje E dia ideal, indicar horario (8h-10h terca-quinta, 12h-14h segunda/sexta)
+8. Decidir formato baseado em alternancia e adequacao:
    - Se ultimos 2 foram texto puro -> sugerir carrossel ou texto+imagem
    - Se tema e educativo com passos -> carrossel
    - Se tema e opiniao/reflexao -> texto puro
    - Se tema e case/antes-depois -> texto + imagem comparativa
    - Se tema e polemico com multiplas visoes -> enquete
-8. Apresentar recomendacao com justificativa clara:
+9. Apresentar recomendacao com justificativa clara:
    ```
+   SITUACAO ATUAL:
+   Hoje: [dia], [data]
+   Ultimo post: [data] ([X dias atras])
+   Posts esta semana: [N]
+
    RECOMENDACAO:
+   Quando postar: [data e horario] (justificativa temporal)
    Tema: [tema]
    Pilar: [pilar] (ultimo post deste pilar: [data])
    Formato: [formato] (justificativa: [por que este formato])
    Framework: [PAS/SLAY/BAB/AIDA]
+
+   POR QUE ESTE TEMA AGORA:
+   [explicacao de 2-3 linhas conectando gap identificado + relevancia + alternancia]
    ```
-9. Perguntar se usuario confirma ou quer ajustar
+10. Perguntar se usuario confirma ou quer ajustar
 
 ---
 
