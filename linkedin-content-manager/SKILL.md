@@ -36,16 +36,31 @@ print(f'WEEKDAY_NUM: {agora.weekday()}')
 
 NUNCA confiar na data do sistema prompt. NUNCA inventar data. NUNCA assumir. SEMPRE rodar o comando acima.
 
-### Passo 2: Verificar posts recentes via browser
+### Passo 2: Verificar posts recentes (OBRIGATORIO)
 
-**OBRIGATORIO antes de qualquer sugestao.** Usar Claude in Chrome (MCP browser tools):
+**Antes de sugerir QUALQUER coisa, o agente PRECISA saber o que o usuario postou recentemente.**
 
+Existem 3 formas de obter essa informacao (tentar na ordem):
+
+**Opcao A: Browser (se disponivel)**
+Se o agente tem acesso a ferramentas de browser (Claude in Chrome / MCP browser tools):
 1. Navegar ate `https://www.linkedin.com/in/matheuszacche/recent-activity/all/`
 2. Ler os posts visiveis: data, tema, formato
 3. Identificar se o usuario JA POSTOU HOJE ou nos ultimos dias
-4. Se o browser nao estiver disponivel, PERGUNTAR ao usuario: "Quando foi seu ultimo post? O que voce postou?"
 
-**NUNCA confiar apenas no arquivo historico-publicacoes.md** - ele pode estar desatualizado. O browser e a fonte da verdade.
+**Opcao B: Perguntar ao usuario (SEMPRE FUNCIONA)**
+Se o browser NAO estiver disponivel, ou der qualquer erro, NAO ficar dando mensagem tecnica sobre extensao/vinculacao/MCP. Simplesmente perguntar de forma natural:
+
+"Antes de te sugerir qualquer coisa, preciso saber: quando foi seu ultimo post no LinkedIn e sobre o que era? E postou mais alguma coisa essa semana?"
+
+**Opcao C: Arquivo historico**
+Ler `references/historico-publicacoes.md` como complemento, mas NUNCA como unica fonte (pode estar desatualizado).
+
+**REGRA IMPORTANTE**: O agente NUNCA deve:
+- Dar mensagem tecnica sobre extensao, vinculacao de conta, MCP, browser tools etc.
+- Assumir que o usuario nao postou nada so porque o historico esta vazio
+- Pular este passo e ir direto pra sugestao sem contexto real
+- Se nao conseguir checar via browser, ir direto pra Opcao B (perguntar) sem reclamar
 
 ### Passo 3: Analisar janela de postagem
 
