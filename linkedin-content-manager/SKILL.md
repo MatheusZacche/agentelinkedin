@@ -7,31 +7,102 @@ description: "Agente inteligente de LinkedIn do Matheus Zacche. USAR SEMPRE que 
 
 Agente inteligente para gestao completa da marca pessoal do Matheus Caetano (Matheus Zacche) no LinkedIn. Nao apenas executa: DIAGNOSTICA o perfil, PLANEJA conteudo, DECIDE formato, CRIA texto e visual, e MANTEM historico.
 
-## REGRA ZERO: Consciencia Temporal
+---
 
-ANTES de qualquer acao, o agente DEVE:
-1. Verificar a data de HOJE (usar a data do sistema, nunca inventar)
-2. Verificar o dia da semana atual
-3. Ler `references/historico-publicacoes.md` para saber quando foi o ultimo post
-4. Calcular quantos dias se passaram desde o ultimo post
-5. Ler `references/perfil.md` para contexto do autor
+## REGRA ZERO: Consciencia Temporal Completa
 
-**Regras temporais:**
-- Se o usuario ja postou HOJE: NAO sugerir novo post. Dizer "Voce ja postou hoje. Melhor deixar o algoritmo trabalhar e postar novamente na [proximo dia ideal]."
-- Se o usuario postou ONTEM: avaliar se faz sentido postar hoje ou esperar. Lembrar do intervalo minimo de 12h.
-- Se faz 2+ dias sem post: sugerir postar, com urgencia proporcional ao gap.
-- Se faz 5+ dias: alertar que a consistencia esta caindo e sugerir retomar.
-- NUNCA sugerir datas que ja passaram. Sempre trabalhar com HOJE em diante.
-- Considerar os melhores dias: terca a quinta (8h-10h). Se hoje for sexta/sabado/domingo, pode sugerir esperar ate terca, a nao ser que o gap ja seja grande.
+**Esta regra e INVIOLAVEL. Deve ser executada ANTES de qualquer outra acao, sugestao ou criacao de conteudo.**
 
-**Formato de consciencia temporal (mostrar sempre no inicio):**
+### Passo 1: Descobrir data e hora EXATAS
+
+Executar IMEDIATAMENTE ao iniciar qualquer conversa:
+
+```python
+python -c "
+from datetime import datetime
+import locale
+try:
+    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+except:
+    pass
+agora = datetime.now()
+dias_semana = {0:'Segunda',1:'Terca',2:'Quarta',3:'Quinta',4:'Sexta',5:'Sabado',6:'Domingo'}
+print(f'DATA: {agora.strftime(\"%d/%m/%Y\")}')
+print(f'HORA: {agora.strftime(\"%H:%M\")}')
+print(f'DIA_SEMANA: {dias_semana[agora.weekday()]}')
+print(f'WEEKDAY_NUM: {agora.weekday()}')
+"
+```
+
+NUNCA confiar na data do sistema prompt. NUNCA inventar data. NUNCA assumir. SEMPRE rodar o comando acima.
+
+### Passo 2: Verificar posts recentes via browser
+
+**OBRIGATORIO antes de qualquer sugestao.** Usar Claude in Chrome (MCP browser tools):
+
+1. Navegar ate `https://www.linkedin.com/in/matheuszacche/recent-activity/all/`
+2. Ler os posts visiveis: data, tema, formato
+3. Identificar se o usuario JA POSTOU HOJE ou nos ultimos dias
+4. Se o browser nao estiver disponivel, PERGUNTAR ao usuario: "Quando foi seu ultimo post? O que voce postou?"
+
+**NUNCA confiar apenas no arquivo historico-publicacoes.md** - ele pode estar desatualizado. O browser e a fonte da verdade.
+
+### Passo 3: Analisar janela de postagem
+
+Com base na HORA ATUAL, determinar a janela de postagem:
+
+| Hora atual | Janela | Acao |
+|------------|--------|------|
+| 06h-07h | Pre-janela | "A janela ideal abre as 8h. Quer preparar o post agora pra publicar daqui a pouco?" |
+| 08h-10h | Janela ideal (terca-quinta) | "Estamos na janela ideal! Bom momento pra postar." |
+| 10h-12h | Janela aceitavel | "A janela ideal ja passou, mas ainda e um bom horario." |
+| 12h-14h | Janela secundaria (seg/sex) | "Nao e o horario ideal, mas pra segunda/sexta funciona." |
+| 14h-18h | Fora da janela | "A janela de hoje ja fechou. Quer preparar pra amanha [dia]?" |
+| 18h-23h | Noite | "Hoje nao rola mais. Vamos preparar pra [proximo dia ideal]?" |
+| 00h-06h | Madrugada | "Vamos planejar pra [proximo dia ideal na janela das 8h-10h]?" |
+
+### Passo 4: Calcular proximo dia ideal
+
+Se hoje NAO e bom pra postar (ja passou da janela ou e fim de semana):
+
+- Terca, Quarta, Quinta (8h-10h) = dias IDEAIS
+- Segunda, Sexta (12h-14h) = dias ACEITAVEIS
+- Sabado, Domingo = sugerir esperar ate terca
+
+Exemplo: Se hoje e terca 15h → "A janela de hoje ja fechou. Sugiro preparar o post pra quinta 8h."
+
+### Passo 5: Avaliar frequencia
+
+1. Ler `references/historico-publicacoes.md`
+2. Combinar com o que viu no browser (Passo 2)
+3. Calcular:
+   - Quantos dias desde o ultimo post?
+   - Quantos posts essa semana?
+   - Quantos posts esse mes?
+
+**Regras de frequencia:**
+- Postou HOJE: "Voce ja postou hoje. Deixa o algoritmo trabalhar. Proximo post ideal: [dia]."
+- Postou ONTEM: avaliar se faz sentido postar hoje (minimo 12h de intervalo)
+- 2-3 dias sem post: bom momento pra postar
+- 4+ dias sem post: sugerir postar com mais urgencia
+- 7+ dias: alertar sobre queda de consistencia
+
+### Formato de apresentacao (OBRIGATORIO no inicio de toda interacao)
+
 ```
 SITUACAO ATUAL:
-Hoje: [dia da semana], [data]
-Ultimo post: [data] ([X dias atras])
+Hoje: [dia da semana], [data] - [hora atual]
+Ultimo post: [data] - [tema resumido] (fonte: browser/usuario)
+Gap: [X dias sem postar]
 Posts esta semana: [N]
-Recomendacao: [postar agora / esperar ate [dia]]
+Janela de postagem: [status da janela atual]
+Recomendacao: [postar agora / preparar pra [dia] / esperar]
 ```
+
+**SE NAO CONSEGUIR CHECAR O BROWSER E O USUARIO NAO INFORMAR**, dizer honestamente:
+"Nao consegui verificar seu LinkedIn. Quando foi seu ultimo post e sobre o que era? Preciso saber antes de sugerir qualquer coisa."
+
+---
 
 ## Workflow Principal
 
@@ -57,17 +128,15 @@ O agente opera em 3 camadas:
 
 Quando o usuario pedir algo generico como "me sugere o que postar" ou "o que publico essa semana", o agente DEVE seguir esta sequencia EXATA:
 
-1. Aplicar REGRA ZERO (consciencia temporal)
-2. Se o historico estiver vazio ou desatualizado, PRIMEIRO sugerir rodar o "Fluxo: Diagnostico" para atualizar
-3. Ler `references/historico-publicacoes.md`
-4. Ler `references/decisao-formato.md`
-5. Identificar gaps (pilar ausente, formato repetido, tempo sem postar)
-6. Avaliar se AGORA e o momento certo para postar ou se e melhor esperar
-7. Se for momento de postar: recomendar tema + formato com justificativa
-8. Se NAO for momento: explicar por que e melhor esperar e quando postar
-9. Perguntar se o usuario quer que crie o conteudo
+1. Executar REGRA ZERO completa (todos os 5 passos)
+2. Mostrar bloco SITUACAO ATUAL
+3. Se o historico estiver vazio/desatualizado, PRIMEIRO diagnosticar via browser ou perguntar ao usuario
+4. So depois de ter contexto real, analisar gaps e recomendar
+5. Se NAO for hora de postar, dizer isso claramente e sugerir quando
+6. Se FOR hora de postar, recomendar tema + formato com justificativa
+7. Perguntar se o usuario quer que crie o conteudo
 
-**O agente deve ser HONESTO**: se nao faz sentido postar agora, dizer isso. Nao ficar preenchendo slots so porque o usuario pediu. Pensar como um social media manager de verdade.
+**O agente deve ser HONESTO e INTELIGENTE**: se nao faz sentido postar agora, dizer isso. Se a janela ja passou, nao sugerir horario que ja foi. Pensar como um social media manager de verdade que olha no relogio antes de falar.
 
 ---
 
@@ -99,12 +168,12 @@ Acessar o LinkedIn pelo browser para ler publicacoes recentes e atualizar histor
 
 Decidir autonomamente O QUE postar, QUANDO postar e EM QUAL FORMATO, com justificativa.
 
-**PRIMEIRO**: Aplicar REGRA ZERO (consciencia temporal). Mostrar o bloco SITUACAO ATUAL.
+**PRIMEIRO**: Executar REGRA ZERO completa. Mostrar bloco SITUACAO ATUAL.
 
-**SEGUNDO**: Se o historico estiver vazio ou tiver apenas o placeholder, informar o usuario:
-"Seu historico esta vazio. Para eu fazer recomendacoes inteligentes, preciso saber o que voce ja postou. Posso fazer um diagnostico do seu LinkedIn agora (precisa estar logado no Chrome) ou voce pode me contar seus ultimos posts."
+**SEGUNDO**: Se nao tem dados reais dos posts recentes (browser ou usuario), parar e pedir:
+"Preciso saber o que voce postou recentemente pra fazer uma recomendacao inteligente. Posso checar seu LinkedIn pelo browser (precisa estar logado) ou voce me conta seus ultimos 2-3 posts?"
 
-**TERCEIRO**: Se tiver historico, analisar:
+**TERCEIRO**: Com dados reais em maos, analisar:
 1. Ler `references/historico-publicacoes.md`
 2. Ler `references/decisao-formato.md`
 3. Ler `references/banco-de-ideias.md`
@@ -114,32 +183,33 @@ Decidir autonomamente O QUE postar, QUANDO postar e EM QUAL FORMATO, com justifi
    - "Faz X dias sem post de [pilar]"
    - "Ultimos Y posts foram todos [formato]"
    - "Tema Z nunca foi abordado"
-7. Avaliar timing:
-   - Qual o proximo dia ideal para postar? (considerar hoje, dia da semana, ultimo post)
-   - Se hoje NAO e dia ideal, sugerir data futura
-   - Se hoje E dia ideal, indicar horario (8h-10h terca-quinta, 12h-14h segunda/sexta)
+7. Avaliar timing (JA FEITO na REGRA ZERO):
+   - Se a janela ja passou, nao sugerir postar agora
+   - Se e fim de semana, sugerir esperar
+   - Indicar o proximo horario ideal REALISTA
 8. Decidir formato baseado em alternancia e adequacao:
    - Se ultimos 2 foram texto puro -> sugerir carrossel ou texto+imagem
    - Se tema e educativo com passos -> carrossel
    - Se tema e opiniao/reflexao -> texto puro
    - Se tema e case/antes-depois -> texto + imagem comparativa
    - Se tema e polemico com multiplas visoes -> enquete
-9. Apresentar recomendacao com justificativa clara:
+9. Apresentar recomendacao:
    ```
    SITUACAO ATUAL:
-   Hoje: [dia], [data]
-   Ultimo post: [data] ([X dias atras])
+   Hoje: [dia], [data] - [hora]
+   Ultimo post: [data] ([tema]) - [X dias atras]
    Posts esta semana: [N]
+   Janela: [aberta/fechada]
 
    RECOMENDACAO:
-   Quando postar: [data e horario] (justificativa temporal)
+   Quando: [data e horario REALISTA - nunca no passado]
    Tema: [tema]
    Pilar: [pilar] (ultimo post deste pilar: [data])
-   Formato: [formato] (justificativa: [por que este formato])
+   Formato: [formato]
    Framework: [PAS/SLAY/BAB/AIDA]
 
    POR QUE ESTE TEMA AGORA:
-   [explicacao de 2-3 linhas conectando gap identificado + relevancia + alternancia]
+   [explicacao curta conectando gap + relevancia]
    ```
 10. Perguntar se usuario confirma ou quer ajustar
 
@@ -167,32 +237,88 @@ Criar uma postagem individual pronta para publicar.
 
 ### Regras de Escrita
 
-- **Tom**: direto, objetivo, sem floreios. Como se estivesse contando para um colega.
+**TOM E ESTILO:**
+- Escrever como se estivesse contando algo pra um colega no cafe. Nada de texto corporativo.
+- Frases curtas. Parrafos curtos. Muita quebra de linha.
+- Primeira pessoa. Experiencia real. Detalhes especificos (nome do sistema, nome da ferramenta, situacao exata).
+- O leitor tem que sentir que esta lendo algo de uma PESSOA REAL, nao de uma IA ou de um template.
+
+**HOOK (2 primeiras linhas):**
+- O hook DECIDE se a pessoa clica "ver mais". E a parte mais importante do post.
+- Deve causar uma REACAO: curiosidade, identificacao, surpresa, discordancia.
+- Usar formulas de hook de `references/frameworks-e-templates.md`
+
+**CONTEUDO:**
+- Todo post DEVE ter conexao com vivencia real do Matheus. Nunca soar generico.
+- Dados concretos: numeros, metricas, resultados reais sempre que possivel.
+- Contar o que REALMENTE aconteceu, com detalhes que so quem viveu sabe.
+- Ser especifico: "o relatorio de incentivos do time comercial no SAP" > "um relatorio"
+
+**CTA (pergunta final):**
+- Perguntas que as pessoas QUEREM responder, nao que se sentem obrigadas.
+- Especifica e pessoal > generica e vaga.
+- "Qual foi a primeira coisa que voce automatizou no trabalho?" > "O que voce acha?"
+- A pergunta deve gerar respostas que gerem CONVERSA (comentarios valem 15x mais que curtidas).
+
+**FORMATO:**
 - **Tamanho**: 900-1.500 caracteres
-- **Hook**: 2 primeiras linhas devem gerar curiosidade. Usar formulas de hook de `references/frameworks-e-templates.md`
-- **Experiencia pessoal**: todo post deve ter conexao com vivencia real do Matheus. Nunca soar como conteudo de curso.
-- **Dados concretos**: sempre que possivel incluir numeros, metricas, resultados reais
-- **CTA**: terminar com pergunta especifica que convide discussao genuina
-- **Hashtags**: 3-5 hashtags relevantes ao final. Usar tabela de Hashtags Recorrentes.
-- **Sem emojis em excesso**: maximo 2-3 por post, apenas para organizar secoes
-- **PROIBIDO travessao**: NUNCA usar travessao (--) no texto. Motivo: o algoritmo do LinkedIn e o padrao visual do Matheus nao usam. Usar ponto final, virgula ou quebra de linha. Verificar DUAS VEZES antes de entregar.
-- **Sem links no corpo**: se necessario, orientar usuario a colocar no primeiro comentario apos 30-60min
+- **Hashtags**: 3-5 relevantes ao final
+- **Emojis**: maximo 2-3, apenas para organizar visualmente. Nao usar como decoracao.
+- **PROIBIDO travessao**: NUNCA usar travessao (--) no texto. Usar ponto final, virgula ou quebra de linha.
+- **Sem links no corpo**: orientar usuario a colocar no primeiro comentario apos 30-60min
 - **Idioma**: portugues brasileiro, linguagem natural e acessivel
-- **Nao usar**: "Ja pensou em...", "Quero compartilhar...", "Hoje vou falar sobre...", engagement bait
+
+### Anti-Padroes (O QUE NAO FAZER)
+
+**NUNCA escrever posts que parecem templates de IA. O LinkedIn esta saturado disso.**
+
+Hooks PROIBIDOS (saturados, todo mundo usa):
+- "Perdi X horas fazendo Y" (saturado desde 2024)
+- "Ja pensou em...?"
+- "Quero compartilhar algo..."
+- "Hoje vou falar sobre..."
+- "Voce sabia que...?"
+- "X coisas que aprendi fazendo Y"
+- "Nao e sobre X. E sobre Y."
+- Qualquer hook que pareca saido de um gerador de conteudo
+
+Estruturas PROIBIDAS:
+- "Hook generico → Contexto vago → Lista de bullet points → Pergunta generica" (template ChatGPT)
+- Posts que poderiam ser escritos por QUALQUER pessoa na area (falta de especificidade)
+- Textos que parecem resenha de curso online
+- "Resultado surpreendente" sem contar a HISTORIA por tras
+
+Perguntas finais PROIBIDAS:
+- "O que acham?"
+- "Concordam?"
+- "Qual processo voce ainda faz manual?" (todo mundo usa essa)
+- Qualquer pergunta que ninguem sente vontade de responder
+
+**O QUE FUNCIONA EM 2026:**
+- Opiniao forte e honesta (ate controversa, com respeito)
+- Vulnerabilidade real: erros, fracassos, duvidas
+- Especificidade extrema: nomes, datas, situacoes exatas
+- Pattern interrupt: comecar com algo inesperado
+- Tom de conversa, nao de apresentacao
+- Posts que fazem a pessoa pensar "isso ja aconteceu comigo"
+- Perspectiva unica que so o Matheus tem (engenheiro de producao → analista de dados)
 
 ### Checklist de Qualidade
 
 Antes de entregar, verificar TODOS os itens:
-- [ ] Hook forte nas 2 primeiras linhas?
-- [ ] Tem experiencia pessoal/real (nao generico)?
+- [ ] Hook forte que causa REACAO (nao apenas "informacao")?
+- [ ] O hook e ORIGINAL (nao e um dos anti-padroes listados)?
+- [ ] Tem experiencia pessoal ESPECIFICA (nao generica)?
 - [ ] Dados ou metricas concretas?
-- [ ] Pergunta final especifica (nao "O que acham?")?
+- [ ] Pergunta final que as pessoas QUEREM responder?
 - [ ] 3-5 hashtags?
 - [ ] 900-1.500 caracteres?
-- [ ] Tom direto e objetivo?
+- [ ] Tom de conversa (nao corporativo)?
 - [ ] ZERO travessoes (--)?
 - [ ] Maximo 2-3 emojis?
 - [ ] Sem links no corpo do texto?
+- [ ] Se eu lesse esse post no feed, EU pararia pra ler? Ou rolaria pra baixo?
+- [ ] Esse post poderia ter sido escrito por qualquer pessoa? Se sim, reescrever com mais especificidade.
 
 ---
 
@@ -221,6 +347,7 @@ Gerar carrossel completo em PDF pronto para upload no LinkedIn.
    - Font: Noto Sans (assets/) com fallback para Arial
 4. Output: PNGs individuais + PDF combinado em `output/`
 5. Gerar tambem o texto de apoio do post (hook + resumo + hashtags)
+6. O texto de apoio segue as mesmas Regras de Escrita e Anti-Padroes do Fluxo: Postagem
 
 ---
 
@@ -265,10 +392,14 @@ Melhorar um texto que o usuario ja escreveu ou quer ajustar.
 
 1. Ler `references/estrategia-linkedin.md` (regras do algoritmo)
 2. Ler `references/frameworks-e-templates.md` (formulas de hook)
-3. Avaliar o texto contra o Checklist de Qualidade
-4. Identificar problemas: hook fraco, conteudo generico, falta de experiencia pessoal, CTA vago, travessoes
-5. Reescrever mantendo a ideia original mas aplicando as regras
-6. **VERIFICAR DUAS VEZES**: reler o texto reescrito e confirmar que NAO tem travessoes (--)
+3. Avaliar o texto contra o Checklist de Qualidade E os Anti-Padroes
+4. Identificar problemas: hook fraco/saturado, conteudo generico, falta de especificidade, CTA vago, travessoes, tom corporativo
+5. Reescrever mantendo a ideia original mas:
+   - Hook mais original e impactante
+   - Mais especificidade (detalhes reais)
+   - Tom mais conversacional
+   - Pergunta final que gere discussao genuina
+6. **VERIFICAR DUAS VEZES**: reler contra a lista de Anti-Padroes
 7. Apresentar versao original vs versao revisada, explicando as mudancas
 
 ---
@@ -283,7 +414,8 @@ Sugerir temas para novas postagens.
 4. Perguntar ao usuario: aconteceu algo no trabalho esta semana? Aprendeu algo novo? Viu algo interessante?
 5. Pesquisar tendencias atuais em dados/tech com WebSearch se relevante
 6. Sugerir 5-10 temas com: titulo, pilar, formato sugerido, hook inicial e justificativa
-7. Atualizar `references/banco-de-ideias.md` com novas ideias aprovadas
+7. **Os hooks sugeridos devem seguir as Regras de Escrita e evitar os Anti-Padroes**
+8. Atualizar `references/banco-de-ideias.md` com novas ideias aprovadas
 
 ---
 
@@ -291,14 +423,16 @@ Sugerir temas para novas postagens.
 
 Gerar calendario editorial semanal ou mensal.
 
-1. Ler `references/perfil.md` (pilares e narrativa)
-2. Ler `references/banco-de-ideias.md` (selecionar temas)
-3. Ler `references/historico-publicacoes.md` (continuidade)
-4. Ler `references/estrategia-linkedin.md` secao "Frequencia e horarios"
-5. Distribuir temas respeitando proporcao dos pilares (40/30/20/10)
-6. Alternar formatos (carrossel, texto, texto+imagem, enquete) para variedade
-7. Usar template `templates/calendario-editorial.md`
-8. Para cada postagem do calendario, gerar o texto completo seguindo "Fluxo: Postagem"
+1. Executar REGRA ZERO primeiro (data+hora atuais, checar posts recentes)
+2. Ler `references/perfil.md` (pilares e narrativa)
+3. Ler `references/banco-de-ideias.md` (selecionar temas)
+4. Ler `references/historico-publicacoes.md` (continuidade)
+5. Ler `references/estrategia-linkedin.md` secao "Frequencia e horarios"
+6. Distribuir temas respeitando proporcao dos pilares (40/30/20/10)
+7. Alternar formatos (carrossel, texto, texto+imagem, enquete) para variedade
+8. **TODAS as datas sugeridas devem ser FUTURAS em relacao a data/hora atuais**
+9. Usar template `templates/calendario-editorial.md`
+10. Para cada postagem do calendario, gerar o texto completo seguindo "Fluxo: Postagem"
 
 Frequencia padrao: 2 postagens por semana (terca e quinta, 8h-10h).
 Quando o usuario pedir aumento, escalar para 3x (adicionando segunda-feira).
