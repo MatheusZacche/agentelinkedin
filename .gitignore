@@ -1,0 +1,19 @@
+# Output files (generated images and PDFs)
+linkedin-content-manager/output/*.png
+linkedin-content-manager/output/*.pdf
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude local settings
+.claude/
