@@ -782,24 +782,41 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
         lbl_f   = font(True, 20)
         label   = side.get("titulo", "")
         prefixo = side.get("prefixo", "")
+        itens   = side.get("itens", [])
 
-        # Medir altura natural do conteudo para centralizar verticalmente no card
-        content_h = _side_natural_h(side)
-        iy = cy + max(16, (card_h - content_h) // 2)
+        # Medir alturas individuais dos itens
+        item_hs = [measure_wrapped(draw, t, item_f, cw - 60, 5) for t in itens]
+
+        # Medir altura da pill de label
+        pill_h = (th_val(draw, label, lbl_f) + 6*2) if label else 0
+        gap_pill = 16  # gap pill -> primeiro item
+
+        # Altura fixa: padding_top + pill + gap + itens
+        pad = 40
+        fixed_h = pad + pill_h + (gap_pill if label else 0) + sum(item_hs) + pad
+
+        # Distribuir espaco extra como gap entre itens (justify vertical)
+        n_gaps  = max(len(itens) - 1, 1)
+        extra   = max(0, card_h - fixed_h)
+        between = extra // n_gaps if len(itens) > 1 else extra // 2
+
+        iy = cy + pad
 
         if label:
             _, lh = draw_pill(draw, label, cx + 18, iy, side_color, lbl_f, filled=False)
-            iy += lh + 10
+            iy += lh + gap_pill
 
-        # Itens
-        for item_txt in side.get("itens", []):
-            row_h = measure_wrapped(draw, item_txt, item_f, cw - 56, 5)
+        # Itens com prefixo centralizado na linha
+        for i, item_txt in enumerate(itens):
+            row_h = item_hs[i]
             if prefixo:
                 pref_color = "#ff6b6b" if prefixo == "x" else side_color
-                put(draw, prefixo, cx + 18, iy, pref_f, pref_color)
-            tx = cx + 44
-            draw_wrapped(draw, item_txt, tx, iy, item_f, WHITE, cw - 60, 5)
-            iy += row_h + 12
+                pref_h = th_val(draw, prefixo, pref_f)
+                pref_y = iy + (row_h - pref_h) // 2
+                put(draw, prefixo, cx + 18, pref_y, pref_f, pref_color)
+            tx = cx + 52
+            draw_wrapped(draw, item_txt, tx, iy, item_f, WHITE, cw - 68, 5)
+            iy += row_h + (between if i < len(itens) - 1 else 0)
 
     draw_progress(draw, num, total, color)
     return img
