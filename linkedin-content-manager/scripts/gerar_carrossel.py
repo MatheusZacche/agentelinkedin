@@ -444,15 +444,18 @@ def slide_numbered(num, total, titulo, slide_pill, itens, banner_text, color):
     tit_f  = font(True, 22)
     desc_f = font(False, 19)
 
+    pill_f = font(True, 16)
+
     # Altura: max(natural, piso proporcional) para ~75% de preenchimento
     def _num_card_h_natural(item):
         num_str    = "01"
         nw_        = tw(draw, num_str, num_f)
         max_txt_w_ = cw - (PAD + 22 + nw_ + 20 - PAD) - 16
         t_h_ = th_val(draw, item.get("titulo","A"), tit_f) if item.get("titulo") else 0
+        p_h_ = (th_val(draw, item.get("pill","x"), pill_f) + 10 + 8) if item.get("pill") else 0
         d_h_ = measure_wrapped(draw, item.get("texto",""), desc_f, max_txt_w_, 5) if item.get("texto") else 0
-        gap_ = 6 if (item.get("titulo") and item.get("texto")) else 0
-        return t_h_ + gap_ + d_h_ + 40
+        gap_ = 6 if (item.get("titulo") and (item.get("pill") or item.get("texto"))) else 0
+        return t_h_ + p_h_ + gap_ + d_h_ + 40
 
     target_fill = area_h * 3 // 4
     floor_h = max(80, (target_fill - card_gap * max(n-1, 0)) // max(n, 1))
@@ -480,17 +483,23 @@ def slide_numbered(num, total, titulo, slide_pill, itens, banner_text, color):
         max_txt_w = cw - (tx - cx) - 16
 
         titulo_item = item.get("titulo", "")
+        pill_item   = item.get("pill", "")
+        pill_color  = item.get("pill_cor", color)
         desc_item   = item.get("texto", "")
 
         t_h    = th_val(draw, titulo_item or "A", tit_f) if titulo_item else 0
+        p_h    = (th_val(draw, pill_item, pill_f) + 10 + 8) if pill_item else 0
         d_h    = measure_wrapped(draw, desc_item, desc_f, max_txt_w, 5) if desc_item else 0
-        gap_td = 6 if (titulo_item and desc_item) else 0
-        block  = t_h + gap_td + d_h
+        gap_td = 6 if (titulo_item and (pill_item or desc_item)) else 0
+        block  = t_h + gap_td + p_h + d_h
         ty     = cy + (card_h - block) // 2
 
         if titulo_item:
             put(draw, titulo_item, tx, ty, tit_f, WHITE)
             ty += t_h + gap_td
+        if pill_item:
+            draw_pill(draw, pill_item, tx, ty, pill_color, pill_f, filled=True)
+            ty += p_h
         if desc_item:
             draw_wrapped(draw, desc_item, tx, ty, desc_f, GRAY, max_txt_w, 5)
 
@@ -980,10 +989,13 @@ if __name__ == "__main__":
                 "banner": "Dados no Python, acao automatizada no N8N.",
                 "itens": [
                     {"titulo": "Code Node",
+                     "pill": "Simples", "pill_cor": "#00d4aa",
                      "texto": "Escreve Python direto dentro do N8N. Para transformacoes simples."},
                     {"titulo": "Execute Command",
+                     "pill": "Intermediario", "pill_cor": "#4a9eff",
                      "texto": "N8N chama um script .py externo pelo terminal."},
                     {"titulo": "API via FastAPI",
+                     "pill": "Avancado", "pill_cor": "#a855f7",
                      "texto": "Python roda como API separada. N8N consome via HTTP Request."},
                 ],
             },
