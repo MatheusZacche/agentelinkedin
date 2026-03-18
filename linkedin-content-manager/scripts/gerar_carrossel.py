@@ -361,12 +361,7 @@ def slide_capa(num, total, titulo_destaque, titulo_branco, subtitulo,
     footer_top = H - FOOTER_H - 14
     box_bottom = footer_top - preview_h - (24 if preview_h else 0)
     raw_box_h  = box_bottom - y - 8
-    MAX_BOX_H  = 340
-    if raw_box_h > MAX_BOX_H:
-        y     += (raw_box_h - MAX_BOX_H) // 2
-        box_h  = MAX_BOX_H
-    else:
-        box_h  = raw_box_h
+    box_h = max(raw_box_h, 60)
 
     if abstract and box_h > 60:
         bx = PAD
@@ -719,10 +714,10 @@ def slide_cta(num, total, pergunta, detalhe, color):
     ct     = HEADER_H + 20
     cb     = H - FOOTER_H - 20
     avail  = cb - ct
-    card_h = int(avail * 0.60)
+    card_h = avail
     cx     = PAD
     cw     = W - 2 * PAD
-    cy     = ct + (avail - card_h) // 2
+    cy     = ct
 
     draw.rounded_rectangle((cx, cy, cx+cw, cy+card_h),
                             radius=14, fill=CARD_BG)
