@@ -15,5 +15,24 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Claude local settings
-.claude/
+# Claude local settings (nao commitar — especificos de cada maquina)
+.claude/settings.json
+.claude/settings.local.json
+
+# Environment variables (API keys)
+.env
+
+# Arquivos de runtime do servidor web (abordagem alternativa, nao e a skill)
+server.log
+conversations.db
+server.py
+interface/
+
+# Pasta portavel (tem seu proprio repositorio git)
+agentelinkedin/
+
+# Dados de analytics (arquivos pessoais — nao commitar)
+dados/
+linkedin-content-manager/dados/*.xlsx
+linkedin-content-manager/dados/*.csv
+linkedin-content-manager/dados/_post_cache.json
