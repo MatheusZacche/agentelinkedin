@@ -356,16 +356,14 @@ def slide_capa(num, total, titulo_destaque, titulo_branco, subtitulo,
 
     y += 28
 
-    # Abstract highlight box
-    preview_h  = 200 if (preview_cards and len(preview_cards) >= 2) else 0
-    footer_top = H - FOOTER_H - 14
-    box_bottom = footer_top - preview_h - (24 if preview_h else 0)
-    raw_box_h  = box_bottom - y - 8
-    box_h = max(raw_box_h, 60)
-
-    if abstract and box_h > 60:
+    # Abstract highlight box (content-fit — sem preencher o espaco todo)
+    if abstract:
         bx = PAD
         bw = W - 2 * PAD
+        af    = font(True, 34)
+        lines = wrap_lines(draw, abstract, af, bw - 80)
+        lh    = sum(th_val(draw, l, af) + 12 for l in lines)
+        box_h = lh + 36   # padding top + bottom
 
         draw.rounded_rectangle((bx, y, bx+bw, y+box_h),
                                 radius=14, fill=tint(DARK_BG, color, 0.14))
@@ -373,18 +371,18 @@ def slide_capa(num, total, titulo_destaque, titulo_branco, subtitulo,
                                 radius=14, outline=color, width=1)
         draw.rounded_rectangle((bx, y, bx+5, y+box_h), radius=2, fill=color)
 
-        af    = font(True, 36)
-        lines = wrap_lines(draw, abstract, af, bw - 100)
-        lh    = sum(th_val(draw, l, af) + 14 for l in lines)
-        ay    = y + (box_h - lh) // 2
+        ay = y + 18
         for line in lines:
             put_center(draw, line, bx + bw//2, ay, af, WHITE)
-            ay += th_val(draw, line, af) + 14
+            ay += th_val(draw, line, af) + 12
 
-        y = box_bottom + 24
+        y += box_h + 24
 
-    elif preview_h:
-        y = box_bottom + 24
+    # Preview cards posicionados acima do footer
+    preview_h  = 200 if (preview_cards and len(preview_cards) >= 2) else 0
+    footer_top = H - FOOTER_H - 14
+    if preview_h:
+        y = footer_top - preview_h - 8
 
     # Preview cards
     if preview_cards and len(preview_cards) >= 2:
