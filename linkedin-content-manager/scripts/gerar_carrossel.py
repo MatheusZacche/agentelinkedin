@@ -783,24 +783,18 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
         label   = side.get("titulo", "")
         prefixo = side.get("prefixo", "")
         itens   = side.get("itens", [])
+        item_gap = 22  # gap fixo entre itens — mantém grupo coeso
 
-        # Medir alturas individuais dos itens
-        item_hs = [measure_wrapped(draw, t, item_f, cw - 60, 5) for t in itens]
+        # Medir alturas individuais
+        item_hs = [measure_wrapped(draw, t, item_f, cw - 68, 5) for t in itens]
+        pill_h  = (th_val(draw, label, lbl_f) + 6*2) if label else 0
+        gap_pill = 18
 
-        # Medir altura da pill de label
-        pill_h = (th_val(draw, label, lbl_f) + 6*2) if label else 0
-        gap_pill = 16  # gap pill -> primeiro item
+        # Altura total do bloco de conteudo
+        block_h = (pill_h + gap_pill if label else 0) + sum(item_hs) + item_gap * (len(itens) - 1)
 
-        # Altura fixa: padding_top + pill + gap + itens
-        pad = 40
-        fixed_h = pad + pill_h + (gap_pill if label else 0) + sum(item_hs) + pad
-
-        # Distribuir espaco extra como gap entre itens (justify vertical)
-        n_gaps  = max(len(itens) - 1, 1)
-        extra   = max(0, card_h - fixed_h)
-        between = extra // n_gaps if len(itens) > 1 else extra // 2
-
-        iy = cy + pad
+        # Centralizar o bloco como unidade no card
+        iy = cy + (card_h - block_h) // 2
 
         if label:
             _, lh = draw_pill(draw, label, cx + 18, iy, side_color, lbl_f, filled=False)
@@ -816,7 +810,7 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
                 put(draw, prefixo, cx + 18, pref_y, pref_f, pref_color)
             tx = cx + 52
             draw_wrapped(draw, item_txt, tx, iy, item_f, WHITE, cw - 68, 5)
-            iy += row_h + (between if i < len(itens) - 1 else 0)
+            iy += row_h + (item_gap if i < len(itens) - 1 else 0)
 
     draw_progress(draw, num, total, color)
     return img
