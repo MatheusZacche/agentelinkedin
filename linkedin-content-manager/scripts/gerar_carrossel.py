@@ -32,7 +32,7 @@ H        = 1350
 PAD      = 56
 HEADER_H = 120
 FOOTER_H = 50
-BANNER_H = 80
+BANNER_H = 96
 
 BG       = "#1a1a2e"
 CARD_BG  = "#2a2a4a"   # mais visivel que o anterior
@@ -270,7 +270,7 @@ def draw_banner(draw, text, color, y_bottom):
     draw.rounded_rectangle((bx, by, bx+bw, by+BANNER_H),
                             radius=10, outline=color, width=1)
 
-    bf    = font(True, 23)
+    bf    = font(True, 27)
     lines = wrap_lines(draw, text, bf, bw - 48)
     total_h = sum(th_val(draw, l, bf) + 6 for l in lines)
     ty = by + (BANNER_H - total_h) // 2
@@ -318,7 +318,7 @@ def draw_slide_title(draw, titulo, y, color, fnt_size=34, pill_label=None,
     Retorna y apos o underline.
     """
     if pill_label:
-        pf = font(True, 16)
+        pf = font(True, 19)
         _, ph = draw_pill(draw, pill_label, PAD, y, pill_color or color, pf)
         y += ph + 14
 
@@ -380,7 +380,7 @@ def slide_capa(num, total, titulo_destaque, titulo_branco, subtitulo,
     title_block_h += 16  # trailing gap (reduced from 28)
 
     # Espaco disponivel antes do abstract/preview
-    _preview_h_est = 200 if (preview_cards and len(preview_cards) >= 2) else 0
+    _preview_h_est = 460 if (preview_cards and len(preview_cards) >= 2) else 0
     _footer_top_est = H - FOOTER_H - 14
     if abstract:
         _af_m = font(True, 34)
@@ -435,7 +435,7 @@ def slide_capa(num, total, titulo_destaque, titulo_branco, subtitulo,
     y += 28
 
     # Abstract + preview cards: âncora no rodapé para evitar espaço no meio
-    preview_h  = 200 if (preview_cards and len(preview_cards) >= 2) else 0
+    preview_h  = 460 if (preview_cards and len(preview_cards) >= 2) else 0
     footer_top = H - FOOTER_H - 14
 
     if abstract:
@@ -468,7 +468,7 @@ def slide_capa(num, total, titulo_destaque, titulo_branco, subtitulo,
     if preview_cards and len(preview_cards) >= 2:
         card_y = y
         card_w = (W - 2*PAD - 20) // 2
-        card_h = 176
+        card_h = 424
         gap    = 20
         arrow_x = PAD + card_w + gap // 2
 
@@ -481,22 +481,29 @@ def slide_capa(num, total, titulo_destaque, titulo_branco, subtitulo,
             draw.rounded_rectangle((cx, card_y, cx+card_w, card_y+card_h),
                                    radius=12, outline=pc_color, width=1)
 
-            if_fnt = font(True, 34)
-            icon   = pc.get("icone", "")
+            # Centralizar conteudo verticalmente no card
+            if_fnt  = font(True, 48)
+            tif     = font(True, 30)
+            sif     = font(False, 24)
+            icon    = pc.get("icone", "")
+            icon_h  = th_val(draw, icon or "x", if_fnt)
+            tit_h   = th_val(draw, pc.get("titulo", "x"), tif)
+            subs    = pc.get("subs", [])
+            subs_h  = len(subs) * (th_val(draw, subs[0] if subs else "x", sif) + 8)
+            content_h = icon_h + 20 + tit_h + 14 + subs_h
+            iy = card_y + (card_h - content_h) // 2
+
             if icon:
-                put_center(draw, icon, cx + card_w//2, card_y + 20, if_fnt, pc_color)
+                put_center(draw, icon, cx + card_w//2, iy, if_fnt, pc_color)
+            iy += icon_h + 20
+            put_center(draw, pc.get("titulo", ""), cx + card_w//2, iy, tif, WHITE)
+            iy += tit_h + 14
+            for sub in subs:
+                put_center(draw, sub, cx + card_w//2, iy, sif, GRAY)
+                iy += th_val(draw, sub, sif) + 8
 
-            tif = font(True, 22)
-            put_center(draw, pc.get("titulo", ""), cx + card_w//2,
-                       card_y + 76, tif, WHITE)
-
-            sif = font(False, 18)
-            for j, sub in enumerate(pc.get("subs", [])):
-                put_center(draw, sub, cx + card_w//2,
-                           card_y + 108 + j * 26, sif, GRAY)
-
-        af = font(False, 28)
-        put_center(draw, ">", arrow_x, card_y + card_h // 2 - 10, af, GRAY)
+        af = font(False, 32)
+        put_center(draw, ">", arrow_x, card_y + card_h // 2 - 12, af, GRAY)
 
     draw_progress(draw, num, total, color)
     return img
@@ -520,11 +527,11 @@ def slide_numbered(num, total, titulo, slide_pill, itens, banner_text, color):
     card_gap = 12
     cw       = W - 2 * PAD
 
-    num_f  = font(True, 38)
-    tit_f  = font(True, 22)
-    desc_f = font(False, 19)
+    num_f  = font(True, 46)
+    tit_f  = font(True, 28)
+    desc_f = font(False, 25)
 
-    pill_f = font(True, 16)
+    pill_f = font(True, 20)
 
     # Cards preenchem toda a area — sem espaco morto
     card_h, card_positions = _fill_cards(y, area_h, n, card_gap)
@@ -603,17 +610,15 @@ def slide_categorias(num, total, titulo, itens, banner_text, color):
     card_gap  = 16
     cw        = W - 2 * PAD
     card_pad  = 16
-    bullet_f  = font(False, 20)
-    label_f   = font(True, 17)
+    bullet_f  = font(False, 26)
+    label_f   = font(True, 20)
 
     natural_h = [_measure_categorias_card(draw, item, cw, label_f, bullet_f, card_pad)
                  for item in itens]
-    # Altura natural + padding confortavel — nao estica cards com pouco conteudo
-    card_h_list = [h + 24 for h in natural_h]
-    card_positions = [area_top + sum(card_h_list[:i]) + card_gap * i for i in range(len(itens))]
+    # Cards preenchem toda a area — sem espaco morto
+    card_h, card_positions = _fill_cards(area_top, area_h, n, card_gap)
 
     for i, item in enumerate(itens):
-        card_h     = card_h_list[i]
         cx         = PAD
         cy         = card_positions[i]
         item_color = item.get("cor", color)
@@ -625,7 +630,8 @@ def slide_categorias(num, total, titulo, itens, banner_text, color):
         draw.rounded_rectangle((cx, cy, cx+4, cy+card_h),
                                 radius=2, fill=item_color)
 
-        iy = cy + card_pad
+        # Centralizar conteudo verticalmente no card
+        iy = cy + max(card_pad, (card_h - natural_h[i]) // 2)
 
         label = item.get("label", "")
         if label:
@@ -666,17 +672,17 @@ def slide_timeline(num, total, titulo, slide_pill, itens, banner_text, color):
     n        = len(itens)
     card_gap = 12
     cw       = W - 2 * PAD
-    pill_f_m = font(True, 17)
-    tit_f_m  = font(True, 22)
-    desc_f_m = font(False, 19)
+    pill_f_m = font(True, 20)
+    tit_f_m  = font(True, 28)
+    desc_f_m = font(False, 25)
 
     # Cards preenchem toda a area — sem espaco morto
     card_h, card_positions_tl = _fill_cards(y, area_h, n, card_gap)
     card_h_list = [card_h] * n
 
-    pill_f = font(True, 17)
-    tit_f  = font(True, 22)
-    desc_f = font(False, 19)
+    pill_f = font(True, 20)
+    tit_f  = font(True, 28)
+    desc_f = font(False, 25)
 
     CR     = 10
     LINE_X = PAD + 2   # centro da linha/circulo na borda esquerda do card
@@ -745,28 +751,25 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
 
     area_h = banner_top - y - 12
     cw     = W - 2 * PAD
-    tit_f  = font(True, 22)
-    item_f = font(False, 19)
-    pref_f = font(True, 22)
+    tit_f  = font(True, 28)
+    item_f = font(False, 25)
+    pref_f = font(True, 28)
     card_gap = 16
 
     # Altura natural de cada card (content-fit)
     def _side_natural_h(side):
-        lbl_f = font(True, 17)
+        lbl_f = font(True, 20)
         lh    = th_val(draw, side.get("titulo", ""), lbl_f) + 6*2 + 12
         ih    = sum(measure_wrapped(draw, t, item_f, cw - 56, 5) + 10
                     for t in side.get("itens", []))
         return 16 + lh + 4 + ih + 16
 
-    n1 = _side_natural_h(esquerda)
-    n2 = _side_natural_h(direita)
-    # Altura natural + padding — nao estica cards com pouco conteudo
-    card_h1 = n1 + 24
-    card_h2 = n2 + 24
+    # Preencher area completa com cards de altura igual
+    card_h, card_positions = _fill_cards(y, area_h, 2, card_gap)
 
-    for idx, (side, card_h) in enumerate([(esquerda, card_h1), (direita, card_h2)]):
+    for idx, side in enumerate([esquerda, direita]):
         cx         = PAD
-        cy         = y + idx * (card_h1 + card_gap) if idx == 1 else y
+        cy         = card_positions[idx]
         side_color = side.get("cor", color)
 
         draw.rounded_rectangle((cx, cy, cx+cw, cy+card_h),
@@ -776,10 +779,14 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
         draw.rounded_rectangle((cx, cy, cx+4, cy+card_h),
                                 radius=2, fill=side_color)
 
-        lbl_f  = font(True, 17)
-        iy     = cy + 16
-        label  = side.get("titulo", "")
+        lbl_f   = font(True, 20)
+        label   = side.get("titulo", "")
         prefixo = side.get("prefixo", "")
+
+        # Medir altura natural do conteudo para centralizar verticalmente no card
+        content_h = _side_natural_h(side)
+        iy = cy + max(16, (card_h - content_h) // 2)
+
         if label:
             _, lh = draw_pill(draw, label, cx + 18, iy, side_color, lbl_f, filled=False)
             iy += lh + 10
@@ -818,8 +825,8 @@ def slide_checklist(num, total, titulo, slide_pill, itens, banner_text, color):
 
     cw      = W - 2 * PAD
     n_items = len(itens)
-    item_f  = font(False, 22)
-    box_s   = 26   # tamanho do quadrado do checkmark
+    item_f  = font(False, 28)
+    box_s   = 32   # tamanho do quadrado do checkmark
 
     # row_h preenche toda a area disponivel
     area_rows = banner_top - y - 12
@@ -945,17 +952,17 @@ def slide_cta(num, total, pergunta, detalhe, color, cta_botao=None):
     cw   = W - 2 * PAD
     cx   = PAD
 
-    q_f   = font(True, 44)
-    d_f   = font(False, 24)
-    btn_f = font(True, 22)
-    sig_b = font(True, 22)
-    sig_f = font(False, 20)
+    q_f   = font(True, 56)
+    d_f   = font(False, 28)
+    btn_f = font(True, 26)
+    sig_b = font(True, 26)
+    sig_f = font(False, 22)
 
     q_h   = measure_wrapped(draw, pergunta, q_f, cw, 8)
     d_h   = measure_wrapped(draw, detalhe,  d_f, cw, 8) if detalhe else 0
-    btn_h = (th_val(draw, cta_botao or "x", btn_f) + 24) if cta_botao else 0
+    btn_h = (th_val(draw, cta_botao or "x", btn_f) + 28) if cta_botao else 0
     sig_h = th_val(draw, "Matheus Zacche", sig_b) + 8 + th_val(draw, "Analista de Dados", sig_f)
-    sep   = 32
+    sep   = 48
 
     total_h = q_h + (sep//2 + d_h if detalhe else 0) + (sep + btn_h if cta_botao else 0) + sep + sig_h
     iy = ct + (cb - ct - total_h) // 2
@@ -972,7 +979,7 @@ def slide_cta(num, total, pergunta, detalhe, color, cta_botao=None):
     if cta_botao:
         iy += sep
         bw    = tw(draw, cta_botao, btn_f) + 80
-        bh    = th_val(draw, cta_botao, btn_f) + 24
+        bh    = th_val(draw, cta_botao, btn_f) + 28
         bx    = cx + (cw - bw) // 2
         draw.rounded_rectangle((bx, iy, bx+bw, iy+bh), radius=bh//2,
                                 outline=color, width=2)
