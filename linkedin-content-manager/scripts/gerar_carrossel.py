@@ -729,6 +729,59 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
 # 4 itens em grade 2x2; item[0] com destaque
 # itens: [{"titulo", "texto", "pill"(opt), "destaque"(bool opt)}, ...]
 # ============================================================================
+# LAYOUT "checklist"
+# Itens com checkmark, sem card background — visual limpo de revisao/lista
+# itens: [str, ...] ou [{"texto": str, "check": bool(opt, default True)}, ...]
+# ============================================================================
+def slide_checklist(num, total, titulo, slide_pill, itens, banner_text, color):
+    img  = Image.new("RGB", (W, H), BG)
+    draw = ImageDraw.Draw(img)
+    draw_header(img, draw)
+
+    banner_top = draw_banner(draw, banner_text, color, H - FOOTER_H - 8)
+    y = draw_slide_title(draw, titulo, HEADER_H + 12, color,
+                         fnt_size=34, pill_label=slide_pill, pill_color=color)
+
+    cw      = W - 2 * PAD
+    item_f  = font(False, 22)
+    row_gap = 20
+    box_s   = 24   # tamanho do quadrado do checkmark
+
+    def draw_checkmark(cx, cy, c):
+        draw.rounded_rectangle((cx, cy, cx+box_s, cy+box_s), radius=4, fill=c)
+        # V shape em branco dentro do quadrado
+        mx, my = cx + box_s//2, cy + box_s - 6
+        lx = cx + 5
+        draw.line([(lx, my-4), (mx-2, my), (cx+box_s-5, cy+7)],
+                  fill=BG, width=2)
+
+    for item in itens:
+        if isinstance(item, str):
+            txt, checked = item, True
+        else:
+            txt, checked = item.get("texto", ""), item.get("check", True)
+
+        check_color = color if checked else DIM_GRAY
+        txt_color   = WHITE if checked else GRAY
+
+        # Linha separadora acima
+        draw.line([(PAD, y), (PAD + cw, y)], fill=tint(BG, color, 0.35), width=1)
+        y += 16
+
+        # Checkmark box
+        draw_checkmark(PAD + 4, y + 2, check_color)
+
+        # Texto alinhado com o centro do box
+        tx    = PAD + box_s + 20
+        row_h = measure_wrapped(draw, txt, item_f, cw - box_s - 24, 5)
+        draw_wrapped(draw, txt, tx, y, item_f, txt_color, cw - box_s - 24, 5)
+        y += max(row_h, box_s + 4) + row_gap
+
+    draw_progress(draw, num, total, color)
+    return img
+
+
+# ============================================================================
 def slide_grade(num, total, titulo, slide_pill, itens, banner_text, color):
     img  = Image.new("RGB", (W, H), BG)
     draw = ImageDraw.Draw(img)
@@ -941,6 +994,11 @@ def gerar_carrossel(titulo_destaque, titulo_branco, subtitulo,
                 n, total, s["titulo"], s.get("pill", ""),
                 s.get("itens", []), s.get("banner", ""), theme_color))
 
+        elif layout == "checklist":
+            images.append(slide_checklist(
+                n, total, s["titulo"], s.get("pill", ""),
+                s.get("itens", []), s.get("banner", ""), theme_color))
+
         else:  # numbered
             images.append(slide_numbered(
                 n, total, s["titulo"], s.get("pill", ""),
@@ -1020,22 +1078,18 @@ if __name__ == "__main__":
                      "texto": "Regras de negocio especificas que nao existem em nos prontos"},
                 ],
             },
-            # Slide 4 — grade 2x2
+            # Slide 4 — checklist
             {
-                "layout": "grade",
-                "titulo": "Padrao Z de leitura",
-                "pill": "HIERARQUIA VISUAL",
-                "banner": "KPI mais importante = canto superior esquerdo.",
+                "layout": "checklist",
+                "titulo": "Antes de publicar, confira",
+                "banner": "Dashboard bom e dashboard util sao coisas diferentes.",
                 "itens": [
-                    {"titulo": "KPI principal",    "cor": "#00d4aa",
-                     "pill": "MAIOR DESTAQUE",     "destaque": True,
-                     "texto": "Primeiro lugar que o olho vai"},
-                    {"titulo": "KPIs secundarios", "cor": "#4a9eff",
-                     "texto": "Complementam o contexto"},
-                    {"titulo": "Tendencias",       "cor": "#a855f7",
-                     "texto": "Graficos que explicam o movimento"},
-                    {"titulo": "Detalhamento",     "cor": "#00d4aa",
-                     "texto": "Tabelas, filtros, drill-down"},
+                    "KPI principal no canto superior esquerdo?",
+                    "Informacoes de cima pra baixo (resumo > detalhe)?",
+                    "Tamanho dos elementos reflete a importancia?",
+                    "Cores usadas com proposito, nao decoracao?",
+                    "Tem espaco em branco suficiente?",
+                    "O usuario sabe pra onde olhar primeiro?",
                 ],
             },
             # Slide 5 — timeline (fluxo real, antes era numbered)
