@@ -752,15 +752,15 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
     area_h = banner_top - y - 12
     cw     = W - 2 * PAD
     tit_f  = font(True, 28)
-    item_f = font(False, 25)
-    pref_f = font(True, 28)
+    item_f = font(False, 30)
+    pref_f = font(True, 30)
     card_gap = 16
 
     # Altura natural de cada card (content-fit)
     def _side_natural_h(side):
         lbl_f = font(True, 20)
         lh    = th_val(draw, side.get("titulo", ""), lbl_f) + 6*2 + 12
-        ih    = sum(measure_wrapped(draw, t, item_f, cw - 56, 5) + 10
+        ih    = sum(measure_wrapped(draw, t, item_f, cw - 56, 5) + 12
                     for t in side.get("itens", []))
         return 16 + lh + 4 + ih + 16
 
@@ -799,7 +799,7 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
                 put(draw, prefixo, cx + 18, iy, pref_f, pref_color)
             tx = cx + 44
             draw_wrapped(draw, item_txt, tx, iy, item_f, WHITE, cw - 60, 5)
-            iy += row_h + 10
+            iy += row_h + 12
 
     draw_progress(draw, num, total, color)
     return img
@@ -947,10 +947,19 @@ def slide_cta(num, total, pergunta, detalhe, color, cta_botao=None):
     draw = ImageDraw.Draw(img)
     draw_header(img, draw)
 
-    ct   = HEADER_H + 20
-    cb   = H - FOOTER_H - 20
-    cw   = W - 2 * PAD
-    cx   = PAD
+    # Card grande que preenche toda a area de conteudo
+    card_x  = PAD
+    card_y  = HEADER_H + 16
+    card_w  = W - 2 * PAD
+    card_b  = H - FOOTER_H - 16
+    card_h  = card_b - card_y
+    draw.rounded_rectangle((card_x, card_y, card_x + card_w, card_b),
+                            radius=18, fill=tint(DARK_BG, color, 0.10))
+    draw.rounded_rectangle((card_x, card_y, card_x + card_w, card_b),
+                            radius=18, outline=tint(BG, color, 0.35), width=1)
+
+    cw  = card_w - 80   # margem interna
+    cx  = card_x + 40
 
     q_f   = font(True, 56)
     d_f   = font(False, 28)
@@ -964,10 +973,10 @@ def slide_cta(num, total, pergunta, detalhe, color, cta_botao=None):
     sig_h = th_val(draw, "Matheus Zacche", sig_b) + 8 + th_val(draw, "Analista de Dados", sig_f)
     sep   = 48
 
-    total_h = q_h + (sep//2 + d_h if detalhe else 0) + (sep + btn_h if cta_botao else 0) + sep + sig_h
-    iy = ct + (cb - ct - total_h) // 2
-    if iy < ct:
-        iy = ct
+    total_h = q_h + (sep//2 + d_h if detalhe else 0) + (sep + btn_h if cta_botao else 0) + sep + 1 + sep//2 + sig_h
+    iy = card_y + (card_h - total_h) // 2
+    if iy < card_y + 24:
+        iy = card_y + 24
 
     # Pergunta grande centralizada
     iy = draw_wrapped_center(draw, pergunta, cx + cw//2, iy, q_f, color, cw, 8)
@@ -1100,35 +1109,35 @@ def gerar_carrossel(titulo_destaque, titulo_branco, subtitulo,
 if __name__ == "__main__":
     gerar_carrossel(
         titulo_destaque="Python + N8N",
-        titulo_branco="Como integrar tratamento\nde dados com automacao",
-        subtitulo="Quando usar cada um e como faze-los trabalhar juntos",
-        pills=["PYTHON", "N8N", "AUTOMACAO"],
+        titulo_branco="Como integrar tratamento\nde dados com automação",
+        subtitulo="Quando usar cada um e como fazê-los trabalhar juntos",
+        pills=["PYTHON", "N8N", "AUTOMAÇÃO"],
         capa_abstract="Cada ferramenta no que faz melhor. Dados no Python. Fluxo no N8N.",
         capa_preview=[
-            {"icone": "{}", "titulo": "Python",
-             "subs": ["Dados", "Transformacao"], "cor": "#4a9eff"},
-            {"icone": "[>>]", "titulo": "N8N",
-             "subs": ["Fluxo", "Automacao"], "cor": "#00d4aa"},
+            {"icone": "‹/›", "titulo": "Python",
+             "subs": ["Dados", "Transformação"], "cor": "#4a9eff"},
+            {"icone": "»»", "titulo": "N8N",
+             "subs": ["Fluxo", "Automação"], "cor": "#00d4aa"},
         ],
         slides_conteudo=[
             # Slide 2 — categorias
             {
                 "layout": "categorias",
                 "titulo": "O papel de cada um",
-                "banner": "Python e o cerebro. N8N e o sistema nervoso.",
+                "banner": "Python é o cérebro. N8N é o sistema nervoso.",
                 "itens": [
                     {"label": "PYTHON", "cor": "#4a9eff", "bullets": [
                         "Limpeza e tratamento de dados",
-                        "Calculos e transformacoes complexas",
+                        "Cálculos e transformações complexas",
                         "Leitura de arquivos (CSV, Excel, JSON)",
-                        "Conexao com bancos de dados",
-                        "Analise e modelagem",
+                        "Conexão com bancos de dados",
+                        "Análise e modelagem",
                     ]},
                     {"label": "N8N", "cor": "#00d4aa", "bullets": [
-                        "Conexao entre sistemas e APIs",
-                        "Triggers automaticos (horario, webhook)",
-                        "Envio de e-mails e notificacoes",
-                        "Orquestracao sem codigo",
+                        "Conexão entre sistemas e APIs",
+                        "Triggers automáticos (horário, webhook)",
+                        "Envio de e-mails e notificações",
+                        "Orquestração sem código",
                     ]},
                 ],
             },
@@ -1136,65 +1145,66 @@ if __name__ == "__main__":
             {
                 "titulo": "Quando usar Python",
                 "pill": "PYTHON",
-                "banner": "Use Python quando o problema esta nos dados.",
+                "banner": "Use Python quando o problema está nos dados.",
                 "itens": [
                     {"titulo": "Tratar dados sujos",
                      "texto": "Normalizar colunas, remover duplicatas, converter tipos com Pandas"},
-                    {"titulo": "Calculos complexos",
-                     "texto": "Formulas, agregacoes, estatisticas alem do basico"},
+                    {"titulo": "Cálculos complexos",
+                     "texto": "Fórmulas, agregações, estatísticas além do básico"},
                     {"titulo": "Processar arquivos",
                      "texto": "Ler e transformar CSV, Excel, JSON, conectar bancos SQL"},
-                    {"titulo": "Logica customizada",
-                     "texto": "Regras de negocio especificas que nao existem em nos prontos"},
+                    {"titulo": "Lógica customizada",
+                     "texto": "Regras de negócio específicas que não existem em nodes prontos"},
                 ],
             },
-            # Slide 4 — checklist
+            # Slide 4 — checklist (Quando usar N8N — espelho do slide 3)
             {
                 "layout": "checklist",
-                "titulo": "Antes de publicar, confira",
-                "banner": "Dashboard bom e dashboard util sao coisas diferentes.",
+                "titulo": "Quando usar N8N",
+                "pill": "N8N",
+                "banner": "Use N8N quando o problema está no fluxo.",
                 "itens": [
-                    "KPI principal no canto superior esquerdo?",
-                    "Informacoes de cima pra baixo (resumo > detalhe)?",
-                    "Tamanho dos elementos reflete a importancia?",
-                    "Cores usadas com proposito, nao decoracao?",
-                    "Tem espaco em branco suficiente?",
-                    "O usuario sabe pra onde olhar primeiro?",
+                    "Precisa agendar uma tarefa recorrente?",
+                    "Quer conectar dois sistemas sem escrever código?",
+                    "Precisa de um gatilho (webhook, e-mail, formulário)?",
+                    "Quer visualizar o fluxo de forma clara?",
+                    "Precisa notificar alguém após uma ação?",
+                    "O processamento de dados é simples o suficiente?",
                 ],
             },
-            # Slide 5 — timeline (fluxo real, antes era numbered)
+            # Slide 5 — timeline
             {
                 "layout": "timeline",
                 "titulo": "Exemplo de fluxo real",
-                "banner": "Cada ferramenta no que faz melhor.",
+                "banner": "N8N orquestra. Python processa. Juntos entregam.",
                 "itens": [
                     {"pill": "N8N",    "cor": "#00d4aa",
-                     "titulo": "Agenda a execucao",
-                     "desc":   "Todo dia as 8h ou via webhook externo"},
+                     "titulo": "Agenda a execução",
+                     "desc":   "Todo dia às 8h ou via webhook externo"},
                     {"pill": "N8N",    "cor": "#00d4aa",
                      "titulo": "Busca os dados",
                      "desc":   "API, banco de dados ou arquivo CSV"},
                     {"pill": "PYTHON", "cor": "#4a9eff",
                      "titulo": "Processa e transforma",
-                     "desc":   "Limpeza, calculos e agregacoes com Pandas"},
+                     "desc":   "Limpeza, cálculos e agregações com Pandas"},
                     {"pill": "N8N",    "cor": "#00d4aa",
                      "titulo": "Distribui o resultado",
                      "desc":   "E-mail, Sheets, Slack ou dashboard"},
                 ],
             },
-            # Slide 6 — numbered (3 formas)
+            # Slide 6 — numbered (3 formas de integrar)
             {
                 "titulo": "3 formas de integrar",
-                "banner": "Dados no Python, acao automatizada no N8N.",
+                "banner": "Escolha o nível certo para a sua situação.",
                 "itens": [
                     {"titulo": "Code Node",
                      "pill": "Simples", "pill_cor": "#00d4aa",
-                     "texto": "Escreve Python direto dentro do N8N. Para transformacoes simples."},
+                     "texto": "Escreve Python direto dentro do N8N. Para transformações simples."},
                     {"titulo": "Execute Command",
-                     "pill": "Intermediario", "pill_cor": "#4a9eff",
+                     "pill": "Intermediário", "pill_cor": "#4a9eff",
                      "texto": "N8N chama um script .py externo pelo terminal."},
                     {"titulo": "API via FastAPI",
-                     "pill": "Avancado", "pill_cor": "#a855f7",
+                     "pill": "Avançado", "pill_cor": "#a855f7",
                      "texto": "Python roda como API separada. N8N consome via HTTP Request."},
                 ],
             },
@@ -1208,26 +1218,26 @@ if __name__ == "__main__":
                     "cor":     "#ff6b6b",
                     "prefixo": "x",
                     "itens": [
-                        "Fazer tudo no N8N (fluxo fragil e gigante)",
-                        "Fazer tudo no Python (perde orquestracao visual)",
-                        "Misturar logica de dados com logica de fluxo",
+                        "Fazer tudo no N8N (fluxo frágil e gigante)",
+                        "Fazer tudo no Python (perde orquestração visual)",
+                        "Misturar lógica de dados com lógica de fluxo",
                     ],
                 },
                 "direita": {
-                    "titulo":  "FACA",
+                    "titulo":  "FAÇA",
                     "cor":     "#00d4aa",
                     "prefixo": "+",
                     "itens": [
                         "Python cuida dos dados: tratar, calcular, transformar",
                         "N8N cuida do fluxo: agendar, conectar, distribuir",
-                        "Cada ferramenta no que faz melhor",
+                        "Cada ferramenta faz o que faz melhor",
                     ],
                 },
             },
         ],
-        cta_pergunta="Voce ja usa Python e N8N juntos?",
-        cta_detalhe="Conta nos comentarios como voce faz a integracao",
-        cta_botao="Comenta qual metodo voce usa!",
+        cta_pergunta="Você já usa Python e N8N juntos?",
+        cta_detalhe="Conta nos comentários como você faz a integração",
+        cta_botao="Comenta qual método você usa!",
         theme_color="#00d4aa",
         output_name="carrossel_test"
     )
