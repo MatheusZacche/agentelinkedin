@@ -2,626 +2,849 @@
 """
 Gerador de Carrossel LinkedIn - Matheus Zacche
 ===============================================
-Gera 8 slides PNG + 1 PDF combinado para upload no LinkedIn.
+Sistema visual baseado nos criativos de referencia (03_estrutura_criativos.md).
 
-Estrutura dos 8 slides:
-  1. Titulo (capa com titulo grande + subtitulo)
-  2. Contexto (problema/cenario dentro de um card)
-  3-6. Conteudo (4 itens numerados, 1 por slide)
-  7. Resumo (bullet points com os pontos principais)
-  8. CTA (call to action: salvar, comentar, seguir)
-
-Design:
-  - 1080x1350px (formato vertical ideal para LinkedIn)
-  - Tema escuro: fundo #1a1a2e, cards #2a2a4a, accent #00d4aa
-  - Header com foto circular do Matheus + badge "Analista de Dados"
-  - Progress bar no footer mostrando slide atual/total
+Dois layouts de slide suportados:
+  - "numbered" : cards compactos com numero 01/02/03 + titulo + descricao
+  - "categorias": cards com pill de categoria + lista de bullet points
 
 Uso:
-    # Via terminal (roda o teste embutido):
-    python gerar_carrossel.py
-
-    # Via import em outro script ou chamada do agente:
-    from gerar_carrossel import gerar_carrossel
-    pdf, pngs = gerar_carrossel(titulo="...", subtitulo="...", ...)
-
-    # Via python -c (como o agente Claude chama):
-    python -c "from scripts.gerar_carrossel import gerar_carrossel; ..."
+    from scripts.gerar_carrossel import gerar_carrossel
+    pdf, pngs = gerar_carrossel(...)
 """
 
 import os
-import textwrap
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 # ============================================================================
-# PATHS - Caminhos relativos ao script para funcionar em qualquer maquina
+# PATHS
 # ============================================================================
-# __file__ aponta para este script. Subimos um nivel para chegar na skill root.
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SKILL_DIR = os.path.dirname(SCRIPT_DIR)  # pasta linkedin-content-manager/
-ASSETS_DIR = os.path.join(SKILL_DIR, "assets")  # fontes e foto
-OUTPUT_DIR = os.path.join(SKILL_DIR, "output")  # onde salva PNGs e PDFs
+SKILL_DIR  = os.path.dirname(SCRIPT_DIR)
+ASSETS_DIR = os.path.join(SKILL_DIR, "assets")
+OUTPUT_DIR = os.path.join(SKILL_DIR, "output")
 
-# Caminhos dos assets individuais
-PHOTO_PATH = os.path.join(ASSETS_DIR, "foto_matheus.jpeg")
+PHOTO_PATH   = os.path.join(ASSETS_DIR, "foto_matheus.jpeg")
 FONT_REGULAR = os.path.join(ASSETS_DIR, "NotoSans-Regular.ttf")
-FONT_BOLD = os.path.join(ASSETS_DIR, "NotoSans-Bold.ttf")
+FONT_BOLD    = os.path.join(ASSETS_DIR, "NotoSans-Bold.ttf")
 
 # ============================================================================
-# CONSTANTES DE DESIGN - Altere aqui para mudar o visual de TODOS os slides
+# DESIGN
 # ============================================================================
-W = 1080           # Largura do slide em pixels
-H = 1350           # Altura do slide em pixels (formato 4:5 vertical)
-HEADER_H = 140     # Altura reservada para o header (foto + nome)
-FOOTER_H = 60      # Altura reservada para o footer (progress bar)
-PADDING = 60       # Margem lateral em ambos os lados
-CARD_RADIUS = 20   # Raio das bordas arredondadas dos cards
+W        = 1080
+H        = 1350
+PAD      = 56          # margem lateral
+HEADER_H = 120         # altura do header + separador
+FOOTER_H = 50          # barra de progresso
+BANNER_H = 76          # banner de destaque (slides 2-7)
 
-# Paleta de cores - tema escuro profissional
-BG_COLOR = "#1a1a2e"    # Fundo principal (azul escuro)
-CARD_COLOR = "#2a2a4a"  # Fundo dos cards (um tom mais claro)
-ACCENT = "#00d4aa"      # Cor de destaque/accent (cyan/verde agua)
-WHITE = "#ffffff"        # Texto principal
-LIGHT_GRAY = "#b0b0c0"  # Texto secundario (subtitulos, descricoes)
-DARK_GRAY = "#3a3a5a"   # Elementos sutis (barra de progresso fundo)
-
-# Configuracoes da foto circular no header
-PHOTO_SIZE = 80   # Diametro da foto em pixels
-PHOTO_TOP = 30    # Distancia do topo ate a foto
+BG         = "#1a1a2e"
+CARD_BG    = "#22223a"
+WHITE      = "#ffffff"
+GRAY       = "#a0a0b8"
+DIM_GRAY   = "#4a4a6a"   # numero dos cards
+SEP        = "#2a2a48"   # linha separadora header
+DARK_BG    = "#141428"   # fundo mais escuro para contraste
 
 
-# ============================================================================
-# FUNCOES UTILITARIAS
-# ============================================================================
-
-def load_font(bold=False, size=24):
-    """Carrega a fonte Noto Sans dos assets, com fallback para Arial.
-
-    A Noto Sans foi escolhida por ter boa cobertura de caracteres
-    (incluindo acentos em portugues) e ser visualmente limpa.
-
-    Args:
-        bold: Se True, carrega a versao Bold da fonte
-        size: Tamanho da fonte em pixels
-
-    Returns:
-        Objeto ImageFont pronto para uso com Pillow
-    """
+def font(bold=False, size=24):
     path = FONT_BOLD if bold else FONT_REGULAR
     try:
         return ImageFont.truetype(path, size)
     except (OSError, IOError):
-        # Se Noto Sans nao estiver disponivel, tenta Arial (Windows)
         try:
-            fallback = "arialbd.ttf" if bold else "arial.ttf"
-            return ImageFont.truetype(fallback, size)
+            return ImageFont.truetype("arialbd.ttf" if bold else "arial.ttf", size)
         except (OSError, IOError):
-            # Ultimo recurso: fonte padrao do Pillow (sem anti-aliasing)
             return ImageFont.load_default()
 
 
-def make_circular_photo(size=PHOTO_SIZE):
-    """Cria foto circular recortada da foto_matheus.jpeg.
+def hex_rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
-    A foto original e vertical (720x1280). O rosto esta na parte
-    superior, entao cortamos do topo ao centro para capturar o rosto.
-    Depois aplicamos uma mascara circular para o efeito de avatar.
 
-    Args:
-        size: Diametro do circulo em pixels
+def tint(base_hex, color_hex, alpha=0.18):
+    """Mistura base_hex com color_hex no alpha dado."""
+    br, bg, bb = hex_rgb(base_hex)
+    cr, cg, cb = hex_rgb(color_hex)
+    return (
+        int(br + (cr - br) * alpha),
+        int(bg + (cg - bg) * alpha),
+        int(bb + (cb - bb) * alpha),
+    )
 
-    Returns:
-        Imagem RGBA com a foto circular (fundo transparente)
-    """
+
+# ============================================================================
+# UTILITARIOS DE TEXTO
+# ============================================================================
+
+def bb(draw, text, fnt):
+    """Retorna (x0,y0,x1,y1) do textbbox."""
+    return draw.textbbox((0, 0), text, font=fnt)
+
+
+def tw(draw, text, fnt):
+    b = bb(draw, text, fnt)
+    return b[2] - b[0]
+
+
+def th_val(draw, text, fnt):
+    b = bb(draw, text, fnt)
+    return b[3] - b[1]
+
+
+def put(draw, text, x, y, fnt, fill=WHITE):
+    """Desenha texto compensando offset interno da fonte."""
+    b = bb(draw, text, fnt)
+    draw.text((x - b[0], y - b[1]), text, font=fnt, fill=fill)
+
+
+def put_center(draw, text, cx, y, fnt, fill=WHITE):
+    """Centraliza texto horizontalmente em torno de cx."""
+    b = bb(draw, text, fnt)
+    put(draw, text, cx - (b[2] - b[0]) // 2, y, fnt, fill)
+
+
+def wrap_lines(draw, text, fnt, max_w):
+    """Quebra texto em linhas que cabem em max_w."""
+    words = text.split()
+    lines, cur = [], ""
+    for w in words:
+        test = (cur + " " + w).strip()
+        if tw(draw, test, fnt) <= max_w:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [""]
+
+
+def draw_wrapped(draw, text, x, y, fnt, fill, max_w, line_gap=8):
+    """Desenha texto com wrap. Retorna Y final."""
+    for line in wrap_lines(draw, text, fnt, max_w):
+        put(draw, line, x, y, fnt, fill)
+        y += th_val(draw, line, fnt) + line_gap
+    return y
+
+
+def draw_wrapped_center(draw, text, cx, y, fnt, fill, max_w, line_gap=8):
+    """Desenha texto centralizado com wrap."""
+    for line in wrap_lines(draw, text, fnt, max_w):
+        put_center(draw, line, cx, y, fnt, fill)
+        y += th_val(draw, line, fnt) + line_gap
+    return y
+
+
+def measure_wrapped(draw, text, fnt, max_w, line_gap=8):
+    """Retorna altura total do texto apos wrap."""
+    lines = wrap_lines(draw, text, fnt, max_w)
+    return sum(th_val(draw, l, fnt) + line_gap for l in lines)
+
+
+# ============================================================================
+# FOTO CIRCULAR
+# ============================================================================
+
+def circular_photo(size=56):
     try:
-        photo = Image.open(PHOTO_PATH).convert("RGBA")
-
-        # Recortar quadrado do topo (onde esta o rosto)
-        pw, ph = photo.size
-        crop_size = min(pw, ph)  # Menor dimensao define o quadrado
-        left = (pw - crop_size) // 2  # Centraliza horizontalmente
-        top = 0  # Comeca do topo (rosto esta la)
-        photo = photo.crop((left, top, left + crop_size, top + crop_size))
-
-        # Redimensionar para o tamanho desejado
-        photo = photo.resize((size, size), Image.LANCZOS)
-
-        # Criar mascara circular: branco = visivel, preto = transparente
+        img = Image.open(PHOTO_PATH).convert("RGBA")
+        pw, ph = img.size
+        side = min(pw, ph)
+        img = img.crop(((pw - side) // 2, 0, (pw - side) // 2 + side, side))
+        img = img.resize((size, size), Image.LANCZOS)
         mask = Image.new("L", (size, size), 0)
         ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
-        photo.putalpha(mask)  # Aplica a mascara como canal alpha
-        return photo
-
-    except (FileNotFoundError, IOError):
-        # Se a foto nao existir, cria um circulo colorido como placeholder
-        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        ImageDraw.Draw(img).ellipse((0, 0, size, size), fill=ACCENT)
+        img.putalpha(mask)
         return img
+    except Exception:
+        ph = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        ImageDraw.Draw(ph).ellipse((0, 0, size, size), fill="#00d4aa")
+        return ph
 
 
-def draw_rounded_rect(draw, xy, radius, fill):
-    """Desenha um retangulo com bordas arredondadas.
-
-    Wrapper simples para draw.rounded_rectangle do Pillow.
-
-    Args:
-        draw: Objeto ImageDraw
-        xy: Tupla (x0, y0, x1, y1) com coordenadas do retangulo
-        radius: Raio das bordas arredondadas
-        fill: Cor de preenchimento (hex string ou tupla RGB)
-    """
-    draw.rounded_rectangle(xy, radius=radius, fill=fill)
-
+# ============================================================================
+# HEADER
+# ============================================================================
 
 def draw_header(img, draw):
-    """Desenha o header padrao em todos os slides.
+    PHOTO_SZ = 52
+    py = 18
+    nx = PAD + PHOTO_SZ + 14
 
-    Componentes do header:
-    - Foto circular do Matheus (canto superior esquerdo)
-    - Nome "Matheus Zacche" em bold
-    - Badge "Analista de Dados" com fundo accent
-    - Handle "@matheus-zacche" em cinza claro
+    photo = circular_photo(PHOTO_SZ)
+    img.paste(photo, (PAD, py), photo)
 
-    Args:
-        img: Imagem PIL onde colar a foto (precisa do paste com alpha)
-        draw: Objeto ImageDraw para desenhar textos e shapes
-    """
-    # Foto circular
-    photo = make_circular_photo()
-    photo_x = PADDING
-    photo_y = PHOTO_TOP
-    img.paste(photo, (photo_x, photo_y), photo)  # 3o arg = mascara alpha
+    # Nome
+    fn = font(True, 26)
+    put(draw, "Matheus Zacche", nx, py + 4, fn, WHITE)
+    name_end = nx + tw(draw, "Matheus Zacche", fn)
 
-    # Nome em bold ao lado da foto
-    name_x = photo_x + PHOTO_SIZE + 16  # 16px de gap apos a foto
-    name_font = load_font(bold=True, size=28)
-    draw.text((name_x, photo_y + 8), "Matheus Zacche", fill=WHITE, font=name_font)
+    # Badge verificado
+    bcx = name_end + 16
+    bcy = py + 4 + th_val(draw, "Matheus Zacche", fn) // 2
+    br  = 10
+    draw.ellipse((bcx-br, bcy-br, bcx+br, bcy+br), fill="#1a8cff")
+    cf = font(True, 13)
+    b = bb(draw, "v", cf)
+    draw.text((bcx - (b[2]-b[0])//2 - b[0], bcy - (b[3]-b[1])//2 - b[1]),
+              "v", font=cf, fill=WHITE)
 
-    # Badge "Analista de Dados" com fundo accent
-    badge_font = load_font(bold=False, size=18)
-    badge_text = "Analista de Dados"
-    badge_y = photo_y + 42  # Abaixo do nome
-    # Calcular largura do badge dinamicamente baseado no texto
-    bbox = draw.textbbox((0, 0), badge_text, font=badge_font)
-    bw = bbox[2] - bbox[0] + 20  # +20 de padding horizontal
-    bh = bbox[3] - bbox[1] + 10  # +10 de padding vertical
-    draw.rounded_rectangle(
-        (name_x, badge_y, name_x + bw, badge_y + bh),
-        radius=10, fill=ACCENT
-    )
-    # Texto do badge em cor escura (contraste com fundo accent)
-    draw.text((name_x + 10, badge_y + 3), badge_text, fill=BG_COLOR, font=badge_font)
+    # Handle
+    hf = font(False, 19)
+    put(draw, "@matheus.zacche", nx, py + 38, hf, GRAY)
 
-    # Handle do LinkedIn abaixo do badge
-    handle_font = load_font(bold=False, size=16)
-    draw.text((name_x, badge_y + bh + 6), "@matheus-zacche", fill=LIGHT_GRAY, font=handle_font)
+    # Tres pontos
+    df = font(False, 20)
+    dots = "• • •"
+    put(draw, dots, W - PAD - tw(draw, dots, df), py + 16, df, GRAY)
 
-
-def draw_progress_bar(draw, current, total):
-    """Desenha a barra de progresso no footer do slide.
-
-    Mostra visualmente em qual slide o leitor esta (ex: 3/8).
-    A parte preenchida usa a cor accent, o fundo usa cinza escuro.
-
-    Args:
-        draw: Objeto ImageDraw
-        current: Numero do slide atual (1-based)
-        total: Total de slides no carrossel
-    """
-    bar_y = H - FOOTER_H + 15  # Posicao vertical da barra
-    bar_h = 6                   # Altura da barra (fina)
-    bar_x = PADDING             # Comeca na margem esquerda
-    bar_w = W - 2 * PADDING     # Largura = slide menos margens
-
-    # Fundo da barra (cinza escuro, comprimento total)
-    draw.rounded_rectangle(
-        (bar_x, bar_y, bar_x + bar_w, bar_y + bar_h),
-        radius=3, fill=DARK_GRAY
-    )
-
-    # Parte preenchida (accent, proporcional ao progresso)
-    progress_w = int(bar_w * current / total)
-    if progress_w > 0:
-        draw.rounded_rectangle(
-            (bar_x, bar_y, bar_x + progress_w, bar_y + bar_h),
-            radius=3, fill=ACCENT
-        )
-
-    # Numero da pagina (ex: "3/8") no canto direito
-    page_font = load_font(bold=False, size=16)
-    page_text = f"{current}/{total}"
-    bbox = draw.textbbox((0, 0), page_text, font=page_font)
-    tw = bbox[2] - bbox[0]
-    draw.text((W - PADDING - tw, bar_y + bar_h + 4), page_text, fill=LIGHT_GRAY, font=page_font)
-
-
-def wrap_text(text, font, max_width, draw):
-    """Quebra texto em multiplas linhas para caber na largura maxima.
-
-    Funciona palavra por palavra: vai adicionando palavras na linha
-    atual ate ultrapassar max_width, entao comeca uma nova linha.
-
-    Args:
-        text: Texto para quebrar
-        font: Fonte para calcular largura
-        max_width: Largura maxima em pixels
-        draw: Objeto ImageDraw (necessario para textbbox)
-
-    Returns:
-        Lista de strings, cada uma sendo uma linha que cabe em max_width
-    """
-    words = text.split()
-    lines = []
-    current_line = ""
-
-    for word in words:
-        # Testa se a palavra cabe na linha atual
-        test = f"{current_line} {word}".strip()
-        bbox = draw.textbbox((0, 0), test, font=font)
-        if bbox[2] - bbox[0] <= max_width:
-            current_line = test  # Cabe! Adiciona a palavra
-        else:
-            # Nao cabe: salva a linha atual e comeca nova
-            if current_line:
-                lines.append(current_line)
-            current_line = word
-
-    # Nao esquecer a ultima linha
-    if current_line:
-        lines.append(current_line)
-
-    return lines
-
-
-def text_center(draw, text, y, font, fill=WHITE, max_width=None):
-    """Desenha texto centralizado horizontalmente no slide.
-
-    Se max_width for fornecido, faz word-wrap automatico.
-    Retorna a posicao Y apos o ultimo texto (util para encadear).
-
-    Args:
-        draw: Objeto ImageDraw
-        text: Texto para desenhar
-        y: Posicao Y inicial (topo do texto)
-        font: Fonte a usar
-        fill: Cor do texto
-        max_width: Se fornecido, faz wrap nessa largura
-
-    Returns:
-        Posicao Y logo apos o texto desenhado
-    """
-    if max_width:
-        # Com wrap: desenha cada linha centralizada
-        lines = wrap_text(text, font, max_width, draw)
-        for line in lines:
-            bbox = draw.textbbox((0, 0), line, font=font)
-            tw = bbox[2] - bbox[0]
-            x = (W - tw) // 2  # Centraliza no slide
-            draw.text((x, y), line, fill=fill, font=font)
-            y += bbox[3] - bbox[1] + 8  # Avanca Y + 8px de espacamento
-        return y
-    else:
-        # Sem wrap: linha unica centralizada
-        bbox = draw.textbbox((0, 0), text, font=font)
-        tw = bbox[2] - bbox[0]
-        x = (W - tw) // 2
-        draw.text((x, y), text, fill=fill, font=font)
-        return y + bbox[3] - bbox[1] + 8
+    # Separador
+    sep_y = py + PHOTO_SZ + 14
+    draw.line([(PAD, sep_y), (W - PAD, sep_y)], fill=SEP, width=1)
 
 
 # ============================================================================
-# TIPOS DE SLIDE
+# PROGRESS BAR
 # ============================================================================
 
-def create_slide(slide_num, total, slide_type, **kwargs):
-    """Cria um slide individual do carrossel.
+def draw_progress(draw, cur, total, color):
+    by = H - FOOTER_H + 16
+    bh = 4
+    bx = PAD
+    bw = W - 2 * PAD
 
-    Factory function que gera o slide baseado no tipo.
-    Todos os slides compartilham header + progress bar.
+    draw.rounded_rectangle((bx, by, bx+bw, by+bh), radius=2, fill=DIM_GRAY)
+    filled = int(bw * cur / total)
+    if filled > 0:
+        draw.rounded_rectangle((bx, by, bx+filled, by+bh), radius=2, fill=color)
 
-    Args:
-        slide_num: Numero do slide (1-based, para progress bar)
-        total: Total de slides no carrossel
-        slide_type: Tipo do slide. Opcoes:
-            - 'titulo': Capa com titulo grande e subtitulo
-            - 'contexto': Card com titulo e texto explicativo
-            - 'conteudo': Item numerado com titulo e descricao
-            - 'resumo': Lista de bullet points
-            - 'cta': Call to action (salvar, comentar, seguir)
-        **kwargs: Parametros especificos de cada tipo (ver abaixo)
+    pf = font(False, 17)
+    pt = f"{cur}/{total}"
+    put(draw, pt, W - PAD - tw(draw, pt, pf), by + bh + 5, pf, GRAY)
 
-    Kwargs por tipo:
-        titulo: titulo (str), subtitulo (str)
-        contexto: titulo (str), texto (str)
-        conteudo: numero (int), titulo (str), texto (str)
-        resumo: titulo (str), itens (list[str])
-        cta: titulo (str), acoes (list[str])
 
-    Returns:
-        Imagem PIL (RGB, 1080x1350)
-    """
-    # Canvas base com fundo escuro
-    img = Image.new("RGB", (W, H), BG_COLOR)
+# ============================================================================
+# BANNER DE DESTAQUE
+# ============================================================================
+
+def draw_banner(draw, text, color, y_bottom):
+    """Desenha banner de destaque. Retorna y_top do banner."""
+    bx = PAD
+    bw = W - 2 * PAD
+    by = y_bottom - BANNER_H
+
+    draw.rounded_rectangle((bx, by, bx+bw, by+BANNER_H),
+                            radius=10, fill=tint(DARK_BG, color, 0.30))
+    draw.rounded_rectangle((bx, by, bx+bw, by+BANNER_H),
+                            radius=10, outline=color, width=1)
+
+    bf = font(True, 23)
+    lines = wrap_lines(draw, text, bf, bw - 48)
+    total_h = sum(th_val(draw, l, bf) + 6 for l in lines)
+    ty = by + (BANNER_H - total_h) // 2
+    for line in lines:
+        put_center(draw, line, bx + bw // 2, ty, bf, WHITE)
+        ty += th_val(draw, line, bf) + 6
+
+    return by
+
+
+# ============================================================================
+# PILL
+# ============================================================================
+
+def draw_pill(draw, label, x, y, color, fnt=None):
+    """Desenha uma pill outlined. Retorna (x_right, height)."""
+    if fnt is None:
+        fnt = font(True, 16)
+    ph, pv = 10, 5
+    lw = tw(draw, label, fnt)
+    lh = th_val(draw, label, fnt)
+    pw = lw + ph * 2
+    pill_h = lh + pv * 2
+    draw.rounded_rectangle((x, y, x+pw, y+pill_h),
+                            radius=5, fill=tint(DARK_BG, color, 0.20),
+                            outline=color, width=1)
+    put(draw, label, x + ph, y + pv, fnt, color)
+    return x + pw, pill_h
+
+
+# ============================================================================
+# CIRCULOS DECORATIVOS (capa)
+# ============================================================================
+
+def draw_deco_circles(img, color):
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    r, g, b = hex_rgb(color)
+
+    d.ellipse((-160, H-280, 160, H+100), fill=(r, g, b, 28))
+    d.ellipse((-80, H-180, 80, H+20),   fill=(r, g, b, 18))
+    d.ellipse((W-160, H-280, W+160, H+100), fill=(r, g, b, 22))
+    d.ellipse((W-60, -60, W+120, 120),   fill=(r, g, b, 15))
+
+    blurred = overlay.filter(ImageFilter.GaussianBlur(radius=50))
+    img.paste(blurred, (0, 0), blurred)
+
+
+# ============================================================================
+# SLIDE 1: CAPA
+# ============================================================================
+
+def slide_capa(num, total, titulo_destaque, titulo_branco,
+               subtitulo, pills, preview_cards, color, abstract=None):
+    img  = Image.new("RGB", (W, H), BG)
+    draw_deco_circles(img, color)
     draw = ImageDraw.Draw(img)
-
-    # Elementos comuns a todos os slides
     draw_header(img, draw)
-    draw_progress_bar(draw, slide_num, total)
 
-    # Area util para conteudo (entre header e footer)
-    content_top = HEADER_H + 30
-    content_bottom = H - FOOTER_H - 20
-    content_area = content_bottom - content_top
-    usable_width = W - 2 * PADDING
+    y = HEADER_H + 16
 
-    # --- SLIDE TIPO: TITULO (capa) ---
-    if slide_type == "titulo":
-        title = kwargs.get("titulo", "Titulo")
-        subtitle = kwargs.get("subtitulo", "")
+    # Pills
+    if pills:
+        pf = font(True, 16)
+        x  = PAD
+        ph_max = 0
+        for label in pills:
+            x_right, ph = draw_pill(draw, label, x, y, color, pf)
+            ph_max = max(ph_max, ph)
+            x = x_right + 10
+        y += ph_max + 20
 
-        title_font = load_font(bold=True, size=48)
-        y = content_top + content_area // 4  # Posiciona a ~25% da area
+    # Titulo colorido
+    tf = font(True, 52)
+    if titulo_destaque:
+        for line in titulo_destaque.split("\n"):
+            y = draw_wrapped(draw, line, PAD, y, tf, color, W - 2*PAD, 4)
+        y += 2
 
-        # Linha decorativa accent acima do titulo
-        line_w = 80
-        draw.rounded_rectangle(
-            ((W - line_w) // 2, y - 30, (W + line_w) // 2, y - 24),
-            radius=3, fill=ACCENT
-        )
+    # Titulo branco
+    if titulo_branco:
+        for line in titulo_branco.split("\n"):
+            y = draw_wrapped(draw, line, PAD, y, tf, WHITE, W - 2*PAD, 4)
 
-        # Titulo centralizado com wrap
-        y = text_center(draw, title, y, title_font, fill=WHITE, max_width=usable_width - 40)
+    # Underline
+    draw.rounded_rectangle((PAD, y+6, PAD+64, y+10), radius=2, fill=color)
+    y += 26
 
-        # Subtitulo (se houver)
-        if subtitle:
-            y += 20
-            sub_font = load_font(bold=False, size=28)
-            text_center(draw, subtitle, y, sub_font, fill=LIGHT_GRAY, max_width=usable_width - 60)
+    # Subtitulo
+    if subtitulo:
+        sf = font(False, 26)
+        y  = draw_wrapped(draw, subtitulo, PAD, y, sf, GRAY, W - 2*PAD, 7)
 
-    # --- SLIDE TIPO: CONTEXTO (problema/cenario) ---
-    elif slide_type == "contexto":
-        title = kwargs.get("titulo", "Contexto")
-        texto = kwargs.get("texto", "")
+    y += 28  # breathing room
 
-        title_font = load_font(bold=True, size=36)
-        text_font = load_font(bold=False, size=26)
+    # ---- Abstract highlight box ----
+    # Fills the dead space between subtitle and preview cards / progress bar
+    preview_h  = 200 if (preview_cards and len(preview_cards) >= 2) else 0
+    footer_top = H - FOOTER_H - 14
+    box_bottom  = footer_top - preview_h - (24 if preview_h else 0)
+    raw_box_h   = box_bottom - y - 8
+    MAX_BOX_H   = 340
+    if raw_box_h > MAX_BOX_H:
+        y      += (raw_box_h - MAX_BOX_H) // 2  # centraliza a caixa verticalmente
+        box_h   = MAX_BOX_H
+    else:
+        box_h   = raw_box_h
 
-        # Card grande ocupando quase toda a area
-        card_top = content_top + 40
-        card_bottom = content_bottom - 40
-        draw_rounded_rect(draw, (PADDING, card_top, W - PADDING, card_bottom), CARD_RADIUS, CARD_COLOR)
+    if abstract and box_h > 60:
+        bx = PAD
+        bw = W - 2 * PAD
 
-        y = card_top + 40
-        # Barra accent vertical ao lado do titulo
-        draw.rounded_rectangle(
-            (PADDING + 30, y, PADDING + 36, y + 36),
-            radius=3, fill=ACCENT
-        )
-        draw.text((PADDING + 50, y), title, fill=WHITE, font=title_font)
-        y += 60
+        draw.rounded_rectangle((bx, y, bx+bw, y+box_h),
+                                radius=14, fill=tint(DARK_BG, color, 0.14))
+        draw.rounded_rectangle((bx, y, bx+bw, y+box_h),
+                                radius=14, outline=color, width=1)
+        # Accent bar on left
+        draw.rounded_rectangle((bx, y, bx+5, y+box_h), radius=2, fill=color)
 
-        # Texto do contexto com wrap
-        lines = wrap_text(texto, text_font, usable_width - 100, draw)
+        # Linha decorativa superior + inferior (separa o abstract visualmente)
+        deco_pad = 48
+        draw.line([(bx + deco_pad, y + box_h//2 - 40),
+                   (bx + bw - deco_pad, y + box_h//2 - 40)],
+                  fill=tint(BG, color, 0.40), width=1)
+        draw.line([(bx + deco_pad, y + box_h//2 + 40),
+                   (bx + bw - deco_pad, y + box_h//2 + 40)],
+                  fill=tint(BG, color, 0.40), width=1)
+
+        af    = font(True, 36)
+        lines = wrap_lines(draw, abstract, af, bw - 100)
+        lh    = sum(th_val(draw, l, af) + 14 for l in lines)
+        ay    = y + (box_h - lh) // 2
         for line in lines:
-            draw.text((PADDING + 50, y), line, fill=LIGHT_GRAY, font=text_font)
-            y += 40
+            put_center(draw, line, bx + bw//2, ay, af, WHITE)
+            ay += th_val(draw, line, af) + 14
 
-    # --- SLIDE TIPO: CONTEUDO (item numerado) ---
-    elif slide_type == "conteudo":
-        numero = kwargs.get("numero", 1)
-        titulo_item = kwargs.get("titulo", "Item")
-        texto = kwargs.get("texto", "")
+        y = box_bottom + 24
 
-        # Circulo com o numero do item (estilo badge)
-        num_size = 70
-        num_x = PADDING + 20
-        num_y = content_top + 30
-        draw.ellipse(
-            (num_x, num_y, num_x + num_size, num_y + num_size),
-            fill=ACCENT
-        )
-        # Centralizar numero dentro do circulo
-        num_font = load_font(bold=True, size=36)
-        bbox = draw.textbbox((0, 0), str(numero), font=num_font)
-        nw = bbox[2] - bbox[0]
-        nh = bbox[3] - bbox[1]
-        draw.text(
-            (num_x + (num_size - nw) // 2, num_y + (num_size - nh) // 2 - 4),
-            str(numero), fill=BG_COLOR, font=num_font
-        )
+    elif preview_h:
+        # No abstract: anchor preview cards to bottom
+        y = box_bottom + 24
 
-        # Titulo do item ao lado do numero
-        title_font = load_font(bold=True, size=34)
-        title_x = num_x + num_size + 20
-        draw.text((title_x, num_y + 15), titulo_item, fill=WHITE, font=title_font)
+    # Preview cards (2 cards lado a lado)
+    if preview_cards and len(preview_cards) >= 2:
+        card_y = y
+        card_w = (W - 2*PAD - 20) // 2
+        card_h = 176
+        gap    = 20
+        arrow_x = PAD + card_w + gap // 2
 
-        # Card com a descricao/explicacao
-        card_top = num_y + num_size + 30
-        card_bottom = content_bottom - 40
-        draw_rounded_rect(draw, (PADDING, card_top, W - PADDING, card_bottom), CARD_RADIUS, CARD_COLOR)
+        for i, pc in enumerate(preview_cards[:2]):
+            cx       = PAD + i * (card_w + gap)
+            pc_color = pc.get("cor", color)
 
-        # Texto da descricao com wrap dentro do card
-        text_font = load_font(bold=False, size=26)
-        y = card_top + 30
-        lines = wrap_text(texto, text_font, usable_width - 80, draw)
-        for line in lines:
-            draw.text((PADDING + 40, y), line, fill=LIGHT_GRAY, font=text_font)
-            y += 40
+            draw.rounded_rectangle((cx, card_y, cx+card_w, card_y+card_h),
+                                   radius=12, fill=tint(DARK_BG, pc_color, 0.15))
+            draw.rounded_rectangle((cx, card_y, cx+card_w, card_y+card_h),
+                                   radius=12, outline=pc_color, width=1)
 
-    # --- SLIDE TIPO: RESUMO (bullet points) ---
-    elif slide_type == "resumo":
-        titulo = kwargs.get("titulo", "Resumo")
-        itens = kwargs.get("itens", [])
+            if_fnt = font(True, 34)
+            icon   = pc.get("icone", "")
+            if icon:
+                put_center(draw, icon, cx + card_w//2, card_y + 20, if_fnt, pc_color)
 
-        # Titulo centralizado em accent
-        title_font = load_font(bold=True, size=36)
-        y = content_top + 30
-        text_center(draw, titulo, y, title_font, fill=ACCENT)
-        y += 60
+            tif = font(True, 22)
+            put_center(draw, pc.get("titulo", ""), cx + card_w//2,
+                       card_y + 76, tif, WHITE)
 
-        # Cada item em um mini-card com bullet point accent
-        item_font = load_font(bold=False, size=26)
-        for item in itens:
-            card_h = 80
-            draw_rounded_rect(
-                draw, (PADDING, y, W - PADDING, y + card_h),
-                CARD_RADIUS, CARD_COLOR
-            )
-            # Bolinha accent como bullet point
-            draw.ellipse((PADDING + 20, y + 30, PADDING + 32, y + 42), fill=ACCENT)
-            # Texto do item com wrap
-            lines = wrap_text(item, item_font, usable_width - 80, draw)
-            ly = y + 25
-            for line in lines:
-                draw.text((PADDING + 50, ly), line, fill=WHITE, font=item_font)
-                ly += 32
-            y += card_h + 15
+            sif = font(False, 18)
+            for j, sub in enumerate(pc.get("subs", [])):
+                put_center(draw, sub, cx + card_w//2,
+                           card_y + 108 + j * 26, sif, GRAY)
 
-    # --- SLIDE TIPO: CTA (call to action) ---
-    elif slide_type == "cta":
-        titulo = kwargs.get("titulo", "Gostou?")
-        acoes = kwargs.get("acoes", [
-            "Salve para consultar depois",
-            "Comente sua experiencia",
-            "Siga @matheus-zacche"
-        ])
+        af = font(False, 28)
+        arrow_cy = card_y + card_h // 2 - 10
+        put_center(draw, ">", arrow_x, arrow_cy, af, GRAY)
 
-        # Titulo grande centralizado
-        title_font = load_font(bold=True, size=42)
-        y = content_top + content_area // 5
-        text_center(draw, titulo, y, title_font, fill=WHITE)
-        y += 80
-
-        # Cards de acao com icones
-        action_font = load_font(bold=False, size=28)
-        icons = ["💾", "💬", "➕"]
-        for i, acao in enumerate(acoes):
-            icon = icons[i] if i < len(icons) else ">"
-            card_y = y + i * 100
-            draw_rounded_rect(
-                draw, (PADDING + 40, card_y, W - PADDING - 40, card_y + 80),
-                CARD_RADIUS, CARD_COLOR
-            )
-            draw.text((PADDING + 70, card_y + 22), f"{icon}  {acao}", fill=WHITE, font=action_font)
-
-        # Handle do LinkedIn no rodape do slide
-        handle_font = load_font(bold=True, size=24)
-        text_center(draw, "@matheus-zacche", content_bottom - 40, handle_font, fill=ACCENT)
-
+    draw_progress(draw, num, total, color)
     return img
 
 
 # ============================================================================
-# FUNCAO PRINCIPAL - Gera o carrossel completo
+# SLIDE CONTEUDO: LAYOUT "numbered"
+# Cards compactos com numero 01/02/03 + titulo + descricao
 # ============================================================================
 
-def gerar_carrossel(titulo, subtitulo, contexto_titulo, contexto_texto,
-                     slides_conteudo, resumo_itens,
-                     cta_titulo="Gostou do conteudo?",
-                     output_name="carrossel"):
-    """Gera um carrossel completo de 8 slides + PDF.
+def slide_numbered(num, total, titulo, slide_pill, itens, banner_text, color):
+    img  = Image.new("RGB", (W, H), BG)
+    draw = ImageDraw.Draw(img)
+    draw_header(img, draw)
 
-    Esta e a funcao principal que o agente Claude chama.
-    Ela orquestra a criacao de todos os slides e salva os arquivos.
+    banner_top = draw_banner(draw, banner_text, color, H - FOOTER_H - 8)
+    content_top = HEADER_H + 12
+
+    y = content_top
+
+    # Pill do slide (opcional)
+    if slide_pill:
+        _, ph = draw_pill(draw, slide_pill, PAD, y, color)
+        y += ph + 14
+
+    # Titulo
+    title_f = font(True, 32)
+    y = draw_wrapped(draw, titulo, PAD, y, title_f, WHITE, W - 2*PAD, 4)
+    draw.rounded_rectangle((PAD, y+2, PAD+46, y+6), radius=2, fill=color)
+    y += 18
+
+    # Area dos cards
+    area_h    = banner_top - y - 10
+    n         = len(itens)
+    card_gap  = 10
+    MAX_CH    = 200
+    card_h    = min(MAX_CH, max(90, (area_h - card_gap*(n-1)) // max(n, 1)))
+    block_h   = n * card_h + (n-1) * card_gap
+    start_y   = y + max(0, (area_h - block_h) // 2)
+
+    num_f  = font(True, 34)
+    tit_f  = font(True, 21)
+    desc_f = font(False, 19)
+
+    for i, item in enumerate(itens):
+        cx = PAD
+        cy = start_y + i * (card_h + card_gap)
+        cw = W - 2*PAD
+
+        draw.rounded_rectangle((cx, cy, cx+cw, cy+card_h),
+                                radius=10, fill=CARD_BG)
+        # Barra lateral 4px
+        draw.rounded_rectangle((cx, cy, cx+4, cy+card_h),
+                                radius=2, fill=color)
+
+        # Numero (cinza escuro, nao accent)
+        num_str = f"{i+1:02d}"
+        nw2 = tw(draw, num_str, num_f)
+        nh  = th_val(draw, num_str, num_f)
+        num_x = cx + 20
+        put(draw, num_str, num_x, cy + (card_h - nh) // 2, num_f, DIM_GRAY)
+
+        # Texto
+        tx        = num_x + nw2 + 18
+        max_txt_w = cw - (tx - cx) - 16
+
+        titulo_item = item.get("titulo", "")
+        desc_item   = item.get("texto", "")
+
+        t_h = th_val(draw, titulo_item or "A", tit_f) if titulo_item else 0
+        d_h = measure_wrapped(draw, desc_item, desc_f, max_txt_w, 5) if desc_item else 0
+        gap_td = 6 if (titulo_item and desc_item) else 0
+        block  = t_h + gap_td + d_h
+        ty     = cy + (card_h - block) // 2
+
+        if titulo_item:
+            put(draw, titulo_item, tx, ty, tit_f, WHITE)
+            ty += t_h + gap_td
+        if desc_item:
+            draw_wrapped(draw, desc_item, tx, ty, desc_f, GRAY, max_txt_w, 5)
+
+    draw_progress(draw, num, total, color)
+    return img
+
+
+# ============================================================================
+# SLIDE CONTEUDO: LAYOUT "categorias"
+# 2 cards grandes com pill de categoria + bullet list
+# ============================================================================
+
+def _measure_card_categorias(draw, item, item_color, cw, label_f, bullet_f,
+                              card_pad=14):
+    """Retorna a altura natural de um card categorias (sem desenhar)."""
+    h = card_pad
+    label = item.get("label", "")
+    if label:
+        lh = th_val(draw, label, label_f)
+        pv = 5
+        h += lh + pv * 2 + 10  # pill_h + gap
+    for bullet in item.get("bullets", []):
+        h += measure_wrapped(draw, bullet, bullet_f, cw - 50, 4) + 8
+    h += card_pad
+    return h
+
+
+def slide_categorias(num, total, titulo, itens, banner_text, color):
+    img  = Image.new("RGB", (W, H), BG)
+    draw = ImageDraw.Draw(img)
+    draw_header(img, draw)
+
+    banner_top  = draw_banner(draw, banner_text, color, H - FOOTER_H - 8)
+    content_top = HEADER_H + 12
+
+    y = content_top
+
+    # Titulo
+    title_f = font(True, 32)
+    y = draw_wrapped(draw, titulo, PAD, y, title_f, WHITE, W - 2*PAD, 4)
+    draw.rounded_rectangle((PAD, y+2, PAD+46, y+6), radius=2, fill=color)
+    y += 18
+
+    area_top = y
+    area_h   = banner_top - y - 10
+    n        = len(itens)
+    card_gap = 16
+
+    bullet_f  = font(False, 20)
+    label_f   = font(True, 17)
+    card_pad  = 14
+    cw        = W - 2 * PAD
+
+    # Mede altura natural de cada card
+    natural_heights = [
+        _measure_card_categorias(draw, item, item.get("cor", color),
+                                 cw, label_f, bullet_f, card_pad)
+        for item in itens
+    ]
+    total_natural = sum(natural_heights) + card_gap * max(n - 1, 0)
+
+    if total_natural <= area_h:
+        # Cards menores que area: ancora ao topo (espaco vazio fica embaixo, antes do banner)
+        card_heights = natural_heights
+        start_y = area_top
+    else:
+        # Cards maiores que area: distribui igualmente (escala)
+        equal_h = (area_h - card_gap * max(n - 1, 0)) // max(n, 1)
+        card_heights = [max(equal_h, 80)] * n
+        start_y = area_top
+
+    for i, item in enumerate(itens):
+        card_h     = card_heights[i]
+        cx         = PAD
+        cy         = start_y + sum(card_heights[:i]) + card_gap * i
+        item_color = item.get("cor", color)
+
+        draw.rounded_rectangle((cx, cy, cx+cw, cy+card_h),
+                                radius=10, fill=tint(DARK_BG, item_color, 0.12))
+        draw.rounded_rectangle((cx, cy, cx+4, cy+card_h),
+                                radius=2, fill=item_color)
+
+        iy = cy + card_pad
+
+        # Pill de categoria
+        label = item.get("label", "")
+        if label:
+            _, pill_h = draw_pill(draw, label, cx + 18, iy, item_color, label_f)
+            iy += pill_h + 10
+
+        # Bullets — usa retorno de draw_wrapped para avançar corretamente
+        for bullet in item.get("bullets", []):
+            br = 4
+            draw.ellipse((cx + 18, iy + 8, cx + 18 + br*2, iy + 8 + br*2),
+                         fill=item_color)
+            iy = draw_wrapped(draw, bullet, cx + 32, iy, bullet_f, WHITE,
+                              cw - 50, 4)
+            iy += 6  # gap entre bullets
+
+    draw_progress(draw, num, total, color)
+    return img
+
+
+# ============================================================================
+# SLIDE 8: CTA
+# ============================================================================
+
+def slide_cta(num, total, pergunta, detalhe, color):
+    img  = Image.new("RGB", (W, H), BG)
+    draw = ImageDraw.Draw(img)
+    draw_header(img, draw)
+
+    ct    = HEADER_H + 20
+    cb    = H - FOOTER_H - 20
+    avail = cb - ct
+    card_h = int(avail * 0.60)
+    cx   = PAD
+    cw   = W - 2*PAD
+    cy   = ct + (avail - card_h) // 2
+
+    draw.rounded_rectangle((cx, cy, cx+cw, cy+card_h),
+                            radius=14, fill=CARD_BG)
+    draw.rounded_rectangle((cx, cy, cx+cw, cy+card_h),
+                            radius=14, outline=color, width=1)
+
+    # Conteudo centralizado verticalmente no card
+    q_f  = font(True, 34)
+    d_f  = font(False, 24)
+    s_f  = font(False, 20)
+    sv_f = font(True, 20)
+
+    save_text = "Salva esse post para consultar depois"
+
+    q_h   = measure_wrapped(draw, pergunta, q_f, cw-80, 10)
+    d_h   = measure_wrapped(draw, detalhe,  d_f, cw-80, 8) if detalhe else 0
+    sv_h  = th_val(draw, save_text, s_f)
+    sig_h = th_val(draw, "Matheus Zacche", sv_f)
+    gap   = 28
+
+    total_h = sv_h + 24 + 1 + 24 + q_h + (gap + d_h if detalhe else 0) + gap*2 + sig_h
+    iy = cy + (card_h - total_h) // 2
+    if iy < cy + 20:
+        iy = cy + 20
+
+    # "Salva esse post..."
+    put_center(draw, save_text, cx + cw//2, iy, s_f, GRAY)
+    iy += sv_h + 24
+
+    # Separador
+    draw.line([(cx+48, iy), (cx+cw-48, iy)], fill=SEP, width=1)
+    iy += 1 + 24
+
+    # Pergunta
+    iy = draw_wrapped_center(draw, pergunta, cx+cw//2, iy, q_f, color, cw-80, 10)
+    iy += 6
+
+    # Detalhe
+    if detalhe:
+        iy += gap // 2
+        iy = draw_wrapped_center(draw, detalhe, cx+cw//2, iy, d_f, GRAY, cw-80, 8)
+
+    # Assinatura — no fluxo, logo abaixo do detalhe
+    iy += gap * 2
+    sig = "Matheus Zacche  •  Analista de Dados"
+    put_center(draw, sig, cx + cw//2, iy, sv_f, color)
+
+    draw_progress(draw, num, total, color)
+    return img
+
+
+# ============================================================================
+# FUNCAO PRINCIPAL
+# ============================================================================
+
+def gerar_carrossel(titulo_destaque, titulo_branco, subtitulo,
+                    pills, slides_conteudo, cta_pergunta, cta_detalhe,
+                    capa_preview=None, capa_abstract=None,
+                    theme_color="#00d4aa", output_name="carrossel"):
+    """
+    Gera carrossel completo de 8 slides + PDF.
 
     Args:
-        titulo: Titulo principal do carrossel (slide 1)
-        subtitulo: Subtitulo abaixo do titulo (slide 1)
-        contexto_titulo: Titulo da secao de contexto (slide 2, ex: "O problema")
-        contexto_texto: Texto explicativo do contexto (slide 2)
-        slides_conteudo: Lista de dicts com 'titulo' e 'texto' (slides 3-6).
-                         Cada dict = 1 slide. Maximo 4 itens.
-                         Ex: [{"titulo": "Erro 1", "texto": "Descricao..."}]
-        resumo_itens: Lista de strings para o slide de resumo (slide 7)
-        cta_titulo: Titulo do slide de CTA (slide 8, default: "Gostou do conteudo?")
-        output_name: Nome base dos arquivos de saida (sem extensao)
+        titulo_destaque:  Parte do titulo em theme_color (capa)
+        titulo_branco:    Parte do titulo em branco (capa). Suporta \\n.
+        subtitulo:        Subtitulo cinza (capa)
+        pills:            Lista de strings para pills da capa
+        slides_conteudo:  Lista de 1-6 dicts. Cada dict:
+            Layout "numbered" (default):
+                { "titulo": str, "pill": str (opt), "banner": str,
+                  "itens": [{"titulo": str, "texto": str}, ...] }
+            Layout "categorias":
+                { "titulo": str, "banner": str, "layout": "categorias",
+                  "itens": [{"label": str, "cor": str, "bullets": [str,...]}, ...] }
+        cta_pergunta:     Pergunta no slide 8
+        cta_detalhe:      Texto complementar do CTA
+        capa_abstract:    Frase de destaque que preenche o corpo da capa (opcional)
+        capa_preview:     Lista de 2 dicts para preview cards da capa (opcional):
+                          [{"icone": str, "titulo": str, "subs": [str,...], "cor": str}, ...]
+        theme_color:      Cor hex do tema ("#00d4aa" ou "#f5a623")
+        output_name:      Nome base dos arquivos
 
     Returns:
-        Tupla (pdf_path, png_paths):
-          - pdf_path: Caminho do PDF combinado
-          - png_paths: Lista de caminhos dos PNGs individuais
+        (pdf_path, png_paths)
     """
-    # Garantir que o diretorio de output existe
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    total = 8  # Numero fixo de slides no carrossel
+    total  = 8
     images = []
 
-    # Slide 1: Titulo/capa
-    img1 = create_slide(1, total, "titulo", titulo=titulo, subtitulo=subtitulo)
-    images.append(img1)
+    # Slide 1 — Capa
+    images.append(slide_capa(
+        1, total,
+        titulo_destaque, titulo_branco, subtitulo,
+        pills, capa_preview or [], theme_color,
+        abstract=capa_abstract
+    ))
 
-    # Slide 2: Contexto/problema
-    img2 = create_slide(2, total, "contexto", titulo=contexto_titulo, texto=contexto_texto)
-    images.append(img2)
+    # Slides 2-7 — Conteudo
+    for i, s in enumerate(slides_conteudo[:6]):
+        layout = s.get("layout", "numbered")
+        if layout == "categorias":
+            images.append(slide_categorias(
+                i+2, total,
+                s.get("titulo", ""),
+                s.get("itens", []),
+                s.get("banner", ""),
+                theme_color
+            ))
+        else:
+            images.append(slide_numbered(
+                i+2, total,
+                s.get("titulo", ""),
+                s.get("pill", ""),
+                s.get("itens", []),
+                s.get("banner", ""),
+                theme_color
+            ))
 
-    # Slides 3-6: Conteudo principal (maximo 4 itens)
-    for i, item in enumerate(slides_conteudo[:4]):
-        img = create_slide(i + 3, total, "conteudo",
-                          numero=i + 1,
-                          titulo=item["titulo"],
-                          texto=item["texto"])
-        images.append(img)
+    # Preencher ate 7 se necessario
+    while len(images) < 7:
+        images.append(slide_numbered(
+            len(images)+1, total, "...", "", [], "...", theme_color
+        ))
 
-    # Se menos de 4 itens de conteudo, preenche com placeholders
-    while len(images) < 6:
-        images.append(create_slide(len(images) + 1, total, "conteudo",
-                                   numero=len(images) - 1,
-                                   titulo="...", texto="..."))
+    # Slide 8 — CTA
+    images.append(slide_cta(8, total, cta_pergunta, cta_detalhe, theme_color))
 
-    # Slide 7: Resumo com bullet points
-    img7 = create_slide(7, total, "resumo", titulo="Resumindo", itens=resumo_itens)
-    images.append(img7)
-
-    # Slide 8: Call to Action
-    img8 = create_slide(8, total, "cta", titulo=cta_titulo)
-    images.append(img8)
-
-    # Salvar cada slide como PNG individual
+    # Salvar
     png_paths = []
     for i, img in enumerate(images):
         path = os.path.join(OUTPUT_DIR, f"{output_name}_slide_{i+1}.png")
         img.save(path, "PNG")
         png_paths.append(path)
 
-    # Combinar todos os slides em um unico PDF (pronto para upload no LinkedIn)
-    # Pillow exige imagens RGB (nao RGBA) para salvar como PDF
     pdf_path = os.path.join(OUTPUT_DIR, f"{output_name}.pdf")
-    rgb_images = [img.convert("RGB") for img in images]
-    rgb_images[0].save(pdf_path, "PDF", save_all=True, append_images=rgb_images[1:])
+    rgb = [img.convert("RGB") for img in images]
+    rgb[0].save(pdf_path, "PDF", save_all=True, append_images=rgb[1:])
 
-    print(f"Carrossel gerado com sucesso!")
-    print(f"  PNGs: {len(png_paths)} slides em {OUTPUT_DIR}")
-    print(f"  PDF:  {pdf_path}")
+    print(f"Carrossel gerado: {len(png_paths)} slides | {pdf_path}")
     return pdf_path, png_paths
 
 
 # ============================================================================
-# TESTE - Roda quando executa o script diretamente
+# TESTE
 # ============================================================================
 if __name__ == "__main__":
-    # Exemplo: carrossel sobre erros comuns no Power BI
-    pdf, pngs = gerar_carrossel(
-        titulo="5 Erros Comuns\nno Power BI",
-        subtitulo="E como evitar cada um deles",
-        contexto_titulo="O problema",
-        contexto_texto="Muitos analistas cometem os mesmos erros ao criar dashboards no Power BI. O resultado: relatorios lentos, dados errados e decisoes ruins. Vou mostrar os 5 erros que eu mesmo cometia e como corrigi.",
+    gerar_carrossel(
+        titulo_destaque="Python + N8N",
+        titulo_branco="Como integrar tratamento\nde dados com automacao",
+        subtitulo="Quando usar cada um e como faze-los trabalhar juntos",
+        pills=["PYTHON", "N8N", "AUTOMACAO"],
+        capa_abstract="Cada ferramenta no que faz melhor. Dados no Python. Fluxo no N8N.",
+        capa_preview=[
+            {"icone": "{}", "titulo": "Python", "subs": ["Dados", "Transformacao"], "cor": "#4a9eff"},
+            {"icone": "[>>]", "titulo": "N8N", "subs": ["Fluxo", "Automacao"], "cor": "#00d4aa"},
+        ],
         slides_conteudo=[
-            {"titulo": "Nao modelar os dados",
-             "texto": "Jogar tudo numa tabela unica parece rapido, mas trava o dashboard. Crie um modelo estrela com fatos e dimensoes. Seu Power BI vai agradecer."},
-            {"titulo": "Medidas implicitas",
-             "texto": "Arrastar campos direto no visual cria medidas implicitas que voce nao controla. Sempre crie medidas DAX explicitas. Voce ganha controle total."},
-            {"titulo": "Visuais demais",
-             "texto": "Dashboard com 15 graficos nao informa, confunde. Regra: maximo 6 visuais por pagina. Foque no que o gestor precisa decidir."},
-            {"titulo": "Ignorar o refresh",
-             "texto": "Dados desatualizados destroem confianca. Configure refresh automatico ou alerte o usuario sobre a data de atualizacao."},
+            {
+                "titulo": "O papel de cada um",
+                "banner": "Python e o cerebro. N8N e o sistema nervoso.",
+                "layout": "categorias",
+                "itens": [
+                    {"label": "PYTHON", "cor": "#4a9eff", "bullets": [
+                        "Limpeza e tratamento de dados",
+                        "Calculos e transformacoes complexas",
+                        "Leitura de arquivos (CSV, Excel, JSON)",
+                        "Conexao com bancos de dados",
+                        "Analise e modelagem",
+                    ]},
+                    {"label": "N8N", "cor": "#00d4aa", "bullets": [
+                        "Conexao entre sistemas e APIs",
+                        "Triggers automaticos (horario, webhook)",
+                        "Envio de e-mails e notificacoes",
+                        "Orquestracao sem codigo",
+                    ]},
+                ],
+            },
+            {
+                "titulo": "Quando usar Python",
+                "pill": "PYTHON",
+                "banner": "Use Python quando o problema esta nos dados.",
+                "itens": [
+                    {"titulo": "Tratar dados sujos", "texto": "Normalizar colunas, remover duplicatas, converter tipos com Pandas"},
+                    {"titulo": "Calculos complexos", "texto": "Formulas, agregacoes, estatisticas alem do basico"},
+                    {"titulo": "Processar arquivos", "texto": "Ler e transformar CSV, Excel, JSON, conectar bancos SQL"},
+                    {"titulo": "Logica customizada", "texto": "Regras de negocio especificas que nao existem em nos prontos"},
+                ],
+            },
+            {
+                "titulo": "Quando usar N8N",
+                "pill": "N8N",
+                "banner": "Use N8N quando o problema esta no fluxo.",
+                "itens": [
+                    {"titulo": "Conectar sistemas", "texto": "APIs, bancos, planilhas, e-mails sem escrever codigo"},
+                    {"titulo": "Agendar execucoes", "texto": "Cron jobs visuais, sem servidor dedicado"},
+                    {"titulo": "Orquestrar acoes", "texto": "Sequencia de passos faceis de manter e alterar"},
+                    {"titulo": "Manter sem codigo", "texto": "Fluxos que o time consegue entender e ajustar"},
+                ],
+            },
+            {
+                "titulo": "3 formas de integrar",
+                "banner": "Dados no Python, acao automatizada no N8N.",
+                "itens": [
+                    {"titulo": "Code Node", "texto": "Escreve Python direto dentro do N8N. Ideal para transformacoes simples."},
+                    {"titulo": "Execute Command", "texto": "N8N chama um script .py externo pelo terminal."},
+                    {"titulo": "API via FastAPI", "texto": "Python roda como API separada. N8N consome via HTTP Request."},
+                ],
+            },
+            {
+                "titulo": "Exemplo de fluxo real",
+                "banner": "Cada ferramenta no que faz melhor.",
+                "itens": [
+                    {"titulo": "N8N agenda", "texto": "Todo dia as 8h ou via webhook externo"},
+                    {"titulo": "N8N busca dados", "texto": "API, banco de dados ou arquivo CSV"},
+                    {"titulo": "Python processa", "texto": "Limpeza, calculos e transformacoes com Pandas"},
+                    {"titulo": "N8N distribui", "texto": "E-mail, Sheets, Slack ou dashboard"},
+                ],
+            },
+            {
+                "titulo": "A regra de ouro",
+                "banner": "Python para dados. N8N para fluxo.",
+                "itens": [
+                    {"titulo": "Python cuida dos dados", "texto": "Tratar, calcular, transformar"},
+                    {"titulo": "N8N cuida do fluxo", "texto": "Agendar, conectar, distribuir"},
+                    {"titulo": "Separar responsabilidades", "texto": "Sistema robusto e facil de manter"},
+                ],
+            },
         ],
-        resumo_itens=[
-            "Modele seus dados (estrela)",
-            "Use medidas DAX explicitas",
-            "Maximo 6 visuais por pagina",
-            "Configure refresh automatico",
-        ],
-        cta_titulo="Gostou do conteudo?",
-        output_name="carrossel_powerbi_test"
+        cta_pergunta="Voce ja usa Python e N8N juntos?",
+        cta_detalhe="Conta nos comentarios como voce faz a integracao",
+        theme_color="#00d4aa",
+        output_name="carrossel_test"
     )
