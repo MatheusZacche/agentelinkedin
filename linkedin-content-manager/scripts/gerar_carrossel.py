@@ -725,6 +725,74 @@ def slide_comparativo(num, total, titulo, slide_pill, esquerda, direita,
 
 
 # ============================================================================
+# LAYOUT "grade"
+# 4 itens em grade 2x2; item[0] com destaque
+# itens: [{"titulo", "texto", "pill"(opt), "destaque"(bool opt)}, ...]
+# ============================================================================
+def slide_grade(num, total, titulo, slide_pill, itens, banner_text, color):
+    img  = Image.new("RGB", (W, H), BG)
+    draw = ImageDraw.Draw(img)
+    draw_header(img, draw)
+
+    banner_top = draw_banner(draw, banner_text, color, H - FOOTER_H - 8)
+    y = draw_slide_title(draw, titulo, HEADER_H + 12, color,
+                         fnt_size=34, pill_label=slide_pill, pill_color=color)
+
+    area_h   = banner_top - y - 12
+    gap      = 16
+    card_w   = (W - 2*PAD - gap) // 2
+    card_h   = (area_h - gap) // 2
+
+    num_f  = font(True, 32)
+    tit_f  = font(True, 20)
+    desc_f = font(False, 17)
+    pill_f = font(True, 14)
+
+    for idx, item in enumerate(itens[:4]):
+        row    = idx // 2
+        col    = idx % 2
+        cx     = PAD + col * (card_w + gap)
+        cy     = y + row * (card_h + gap)
+
+        destaque    = item.get("destaque", idx == 0)
+        item_color  = item.get("cor", color)
+        fill_alpha  = 0.22 if destaque else 0.10
+        border_w    = 2 if destaque else 1
+
+        draw.rounded_rectangle((cx, cy, cx+card_w, cy+card_h),
+                                radius=12, fill=tint(DARK_BG, item_color, fill_alpha))
+        draw.rounded_rectangle((cx, cy, cx+card_w, cy+card_h),
+                                radius=12, outline=item_color, width=border_w)
+
+        # Numero
+        num_str = str(idx + 1)
+        nw = tw(draw, num_str, num_f)
+        put(draw, num_str, cx + 16, cy + 14, num_f, item_color)
+
+        # Conteudo a direita do numero
+        tx     = cx + 16 + nw + 12
+        tw_max = card_w - (tx - cx) - 12
+        iy     = cy + 14
+
+        tit = item.get("titulo", "")
+        if tit:
+            put(draw, tit, tx, iy, tit_f, WHITE)
+            iy += th_val(draw, tit, tit_f) + 6
+
+        plab = item.get("pill", "")
+        if plab:
+            _, ph = draw_pill(draw, plab, tx, iy, item_color, pill_f, filled=True)
+            iy += ph + 8
+
+        desc = item.get("texto", "")
+        if desc:
+            draw_wrapped(draw, desc, tx, iy, desc_f, GRAY, tw_max, 4)
+
+    draw_progress(draw, num, total, color)
+    return img
+
+
+# ============================================================================
 # SLIDE 8: CTA
 # ============================================================================
 def slide_cta(num, total, pergunta, detalhe, color, cta_botao=None):
@@ -868,6 +936,11 @@ def gerar_carrossel(titulo_destaque, titulo_branco, subtitulo,
                 s.get("esquerda", {}), s.get("direita", {}),
                 s.get("banner", ""), theme_color))
 
+        elif layout == "grade":
+            images.append(slide_grade(
+                n, total, s["titulo"], s.get("pill", ""),
+                s.get("itens", []), s.get("banner", ""), theme_color))
+
         else:  # numbered
             images.append(slide_numbered(
                 n, total, s["titulo"], s.get("pill", ""),
@@ -947,20 +1020,22 @@ if __name__ == "__main__":
                      "texto": "Regras de negocio especificas que nao existem em nos prontos"},
                 ],
             },
-            # Slide 4 — numbered
+            # Slide 4 — grade 2x2
             {
-                "titulo": "Quando usar N8N",
-                "pill": "N8N",
-                "banner": "Use N8N quando o problema esta no fluxo.",
+                "layout": "grade",
+                "titulo": "Padrao Z de leitura",
+                "pill": "HIERARQUIA VISUAL",
+                "banner": "KPI mais importante = canto superior esquerdo.",
                 "itens": [
-                    {"titulo": "Conectar sistemas",
-                     "texto": "APIs, bancos, planilhas, e-mails sem escrever codigo"},
-                    {"titulo": "Agendar execucoes",
-                     "texto": "Cron jobs visuais, sem servidor dedicado"},
-                    {"titulo": "Orquestrar acoes",
-                     "texto": "Sequencia de passos faceis de manter e alterar"},
-                    {"titulo": "Manter sem codigo",
-                     "texto": "Fluxos que o time consegue entender e ajustar"},
+                    {"titulo": "KPI principal",    "cor": "#00d4aa",
+                     "pill": "MAIOR DESTAQUE",     "destaque": True,
+                     "texto": "Primeiro lugar que o olho vai"},
+                    {"titulo": "KPIs secundarios", "cor": "#4a9eff",
+                     "texto": "Complementam o contexto"},
+                    {"titulo": "Tendencias",       "cor": "#a855f7",
+                     "texto": "Graficos que explicam o movimento"},
+                    {"titulo": "Detalhamento",     "cor": "#00d4aa",
+                     "texto": "Tabelas, filtros, drill-down"},
                 ],
             },
             # Slide 5 — timeline (fluxo real, antes era numbered)
