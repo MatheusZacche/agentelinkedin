@@ -444,17 +444,19 @@ def slide_numbered(num, total, titulo, slide_pill, itens, banner_text, color):
     tit_f  = font(True, 22)
     desc_f = font(False, 19)
 
-    # Altura natural por card (content-fit)
-    def _num_card_h(item):
+    # Altura: max(natural, piso proporcional) para ~75% de preenchimento
+    def _num_card_h_natural(item):
         num_str    = "01"
         nw_        = tw(draw, num_str, num_f)
         max_txt_w_ = cw - (PAD + 22 + nw_ + 20 - PAD) - 16
         t_h_ = th_val(draw, item.get("titulo","A"), tit_f) if item.get("titulo") else 0
         d_h_ = measure_wrapped(draw, item.get("texto",""), desc_f, max_txt_w_, 5) if item.get("texto") else 0
         gap_ = 6 if (item.get("titulo") and item.get("texto")) else 0
-        return max(160, t_h_ + gap_ + d_h_ + 40)
+        return t_h_ + gap_ + d_h_ + 40
 
-    card_heights = [_num_card_h(item) for item in itens]
+    target_fill = area_h * 3 // 4
+    floor_h = max(80, (target_fill - card_gap * max(n-1, 0)) // max(n, 1))
+    card_heights = [max(_num_card_h_natural(item), floor_h) for item in itens]
 
     for i, item in enumerate(itens):
         card_h = card_heights[i]
