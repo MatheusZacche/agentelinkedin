@@ -1,0 +1,75 @@
+# === Secrets & PII ===
+.env
+.env.local
+.env.*.local
+.mcp.json
+secrets.toml
+.streamlit/secrets.toml
+private/
+*.pdf
+
+# === Browser session (Playwright persistent context) ===
+# Login do LinkedIn fica salvo aqui; nunca commitar.
+.browser_profile/
+.playwright-mcp/
+
+# === Banco local de posts ===
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+data/
+
+# === Raw scrapes / runs / drafts em progresso ===
+runs/
+output/
+drafts/_wip/
+assets/generated/
+
+# === Screenshots de smoke / debug ===
+smoke_*.png
+debug_*.png
+post_*.png
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# === Editor / AI tool configs locais ===
+.cursor/
+.gemini/
+.opencode/
+.vscode/
+.idea/
+
+# === Claude Code runtime state (local-only) ===
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
+.claude/projects/
+
+# === OS junk ===
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# === Logs / build ===
+*.log
+logs/
+build/
+*.egg-info/
+node_modules/
+dist/
