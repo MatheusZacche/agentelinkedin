@@ -7,6 +7,18 @@ secrets.toml
 .streamlit/secrets.toml
 private/
 *.pdf
+!linkedin-content-manager/templates/*.pdf
+!linkedin-skill/**/templates/*.pdf
+
+# === Output files (geracoes anteriores — PNG e PDF gerados em runtime) ===
+linkedin-content-manager/output/*.png
+linkedin-content-manager/output/*.pdf
+
+# === Dados de analytics (arquivos pessoais — nao commitar) ===
+dados/
+linkedin-content-manager/dados/*.xlsx
+linkedin-content-manager/dados/*.csv
+linkedin-content-manager/dados/_post_cache.json
 
 # === Browser session (Playwright persistent context) ===
 # Login do LinkedIn fica salvo aqui; nunca commitar.
@@ -37,6 +49,8 @@ post_*.png
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -46,18 +60,28 @@ htmlcov/
 venv/
 env/
 
-# === Editor / AI tool configs locais ===
+# === Runtime do servidor web (abordagem alternativa, nao e a skill) ===
+server.log
+conversations.db
+server.py
+interface/
+
+# === Pasta portavel (tem seu proprio repositorio git) ===
+agentelinkedin/
+
+# === Claude local settings (especificos de cada maquina) ===
+.claude/settings.json
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
+.claude/projects/
+
+# === Editor / IDE ===
 .cursor/
 .gemini/
 .opencode/
 .vscode/
 .idea/
-
-# === Claude Code runtime state (local-only) ===
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
-.claude/scheduled_tasks.json
-.claude/projects/
 
 # === OS junk ===
 .DS_Store
